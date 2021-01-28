@@ -43,7 +43,7 @@ that automatically handle behind-the-scenes managing of Dolt "audits":
   Run (`DoltAuditDT`).
   
 <p align="center">
-  <img src="./audit.jpg" width="650">
+  <img src="./static/audit.jpg" width="650">
 </p>
 
 Interface one pins workflow reads and writes
