@@ -1,14 +1,50 @@
 # Metaflow Dolt integration
 
-## Background
+## Dolt Background
 
-The DoltDT provides two interfaces:
+[Dolt](https://github.com/dolthub/dolt) is a data tool
+intersecting the features of Git and SQL.
+Data is managed with the lifecycle of Git, bringing its rich feature-set
+of transactional logging, merging and diffing to data. Dolt repositories that are
+managed with a clone/push/pull lifecycle can also be accessed via SQL semantics, because 
+selecting, joining and windowing is something we take for granted
+when exploring data.
 
-1. One to access Dolt from a specific commit (`DoltBranchDT`)
-2. A second to access Dolt via the interactions performed by a
-  different Metaflow Run (`DoltAuditDT`).
+## Metaflow Background
+
+[Metaflow](https://github.com/Netflix/metaflow) is a data scientist workflow tool for
+that supports ease of experimentation for individuals
+and easy collaboration for teams.
+
+Code is packaged into "Flows," which are executed as instance "Runs."
+Multiple "Steps" of code blocks comprise a Run, and all of the code, dependencies and
+data artifacts of interest are serialized and saved for transparency, sharing and
+reproducibility. The Metaflow Client API allows users to access and compare
+these data and code artifacts afterwards using the Metaflow namespace hierarchy.
+
+<p align="center">
+  <img src="./static/metaflow.png" width="450">
+</p>
+
+## Integration Architecture
+
+Dolt plugs into Metaflow to provide three main capabilities for data stored in Dolt:
+
+1. Logging - records of interactions between Metaflow and Dolt
+2. Merging - incremental table changes
+3. Diffing - row differences and summaries of row differences
+
+To provide these features, Dolt supplements Metaflow's artifact metadata
+with an "audit" record of Dolt interactions. The DoltDT provides two interfaces
+that automatically handle behind-the-scenes managing of Dolt "audits":
+
+1. Acess Dolt tables pinned to a specific branch or commit (`DoltBranchDT`)
+2. Access the versions of Dolt tables used in a different Metaflow
+  Run (`DoltAuditDT`).
   
-<img src="./audit.jpg" width="650">
+<p align="center">
+  <img src="./audit.jpg" width="650">
+</p>
 
 Interface one pins workflow reads and writes
 from a common branch starting point. The easiest way to access data from
@@ -40,6 +76,8 @@ used to initialize a audit DT (example 2 below). A
 two audits -- one for reading data, and a second for recording what
 versions of data were accessed in the current flow for future
 reproducibility.
+
+## Example Uses
 
 Example 1 (`demo.py`): read from Dolt database
 ```python3
