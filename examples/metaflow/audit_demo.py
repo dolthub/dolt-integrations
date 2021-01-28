@@ -18,8 +18,8 @@ class AuditDemo(FlowSpec):
 
     @step
     def start(self):
-        snapshot = Run(f"VersioningDemo/{self.read_run_id}").data.dolt
-        with DoltDT(run=self, snapshot=snapshot) as dolt:
+        audit = Run(f"VersioningDemo/{self.read_run_id}").data.dolt
+        with DoltDT(run=self, audit=audit) as dolt:
             df = dolt.read("bar")
 
         self.next(self.end)
