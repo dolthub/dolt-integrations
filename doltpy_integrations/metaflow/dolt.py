@@ -80,7 +80,7 @@ class DoltConfig:
 
 
 @dataclass
-class DoltSnapshot(object):
+class DoltAudit(object):
     """
     Dolt lineage metadata used by the DoltDT to track data versions.
     Intended to be used as a metaflow artifact, JSON serializable via .dict().
@@ -112,10 +112,10 @@ def runtime_only(f):
     return inner
 
 
-def snapshot_unsafe(f):
+def audit_unsafe(f):
     @wraps(f)
     def inner(*args, **kwargs):
-        if isinstance(args[0], DoltSnapshotDT):
+        if isinstance(args[0], DoltAuditDT):
             return
         return f(*args, **kwargs)
 
@@ -135,7 +135,7 @@ class DoltBranchDT(object):
         elif hasattr(self._run, "dolt"):
             self._dolt = self._run.dolt
         else:
-            self._run.dolt = DoltSnapshot().dict()
+            self._run.dolt = DoltAudit().dict()
             self._dolt = self._run.dolt
 
         if not isinstance(self._dolt, dict):
@@ -180,7 +180,7 @@ class DoltBranchDT(object):
         )
         return self._execute_read_action(action, self._config)
 
-    @snapshot_unsafe
+    @audit_unsafe
     def sql(self, q: str, as_key: str):
         action = DoltAction(
             kind="read",
@@ -194,7 +194,7 @@ class DoltBranchDT(object):
         return self._execute_read_action(action, self._config)
 
     @runtime_only
-    @snapshot_unsafe
+    @audit_unsafe
     def write(
         self,
         df: pd.DataFrame,
@@ -237,7 +237,7 @@ class DoltBranchDT(object):
         return
 
     @runtime_only
-    @snapshot_unsafe
+    @audit_unsafe
     def _commit_actions(self, allow_empty: bool = True):
         if not self._pending_writes:
             return
@@ -299,22 +299,22 @@ class DoltBranchDT(object):
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
 
-class DoltSnapshotDT(DoltBranchDT):
-    def __init__(self, snapshot: DoltSnapshot, run: Optional[FlowSpec]):
+class DoltAuditDT(DoltBranchDT):
+    def __init__(self, audit: DoltAudit, run: Optional[FlowSpec]):
         """
-        Can only read from a SnapshotDT, and reading is isolated to the snapshot.
+        Can only read from a AuditDT, and reading is isolated to the audit.
         """
         super().__init__(run=run, config=DoltConfig())
-        self._read_snapshot = snapshot
-        self._sactions = {k: DoltAction(**v) for k, v in snapshot["actions"].items()}
-        self._sconfigs = {k: DoltConfig(**v) for k, v in snapshot["configs"].items()}
+        self._read_audit = audit
+        self._sactions = {k: DoltAction(**v) for k, v in audit["actions"].items()}
+        self._sconfigs = {k: DoltConfig(**v) for k, v in audit["configs"].items()}
 
     def read(self, key, as_key: Optional[str] = None):
-        snapshot_action = self._sactions.get(key, None)
-        if not snapshot_action:
-            raise ValueError("Key not found in snapshot")
+        audit_action = self._sactions.get(key, None)
+        if not audit_action:
+            raise ValueError("Key not found in audit")
 
-        action = snapshot_action.copy()
+        action = audit_action.copy()
         action.key = as_key or key
         if action.kind != "read":
             action.kind = "read"
@@ -326,16 +326,16 @@ class DoltSnapshotDT(DoltBranchDT):
 
 def DoltDT(
     run: Optional[FlowSpec] = None,
-    snapshot: Optional[dict] = None,
+    audit: Optional[dict] = None,
     config: Optional[DoltConfig] = None,
 ):
-    if config and snapshot:
-        raise ValueError("Specify snapshot or config mode, not both.")
-    elif snapshot:
-        return DoltSnapshotDT(snapshot=snapshot, run=run)
+    if config and audit:
+        raise ValueError("Specify audit or config mode, not both.")
+    elif audit:
+        return DoltAuditDT(audit=audit, run=run)
     elif config:
         return DoltBranchDT(run, config)
     elif run and hasattr(run, "data") and hasattr(run.data, "dolt"):
-        return DoltSnapshotDT(snapshot=run.data.dolt, run=run)
+        return DoltAuditDT(audit=run.data.dolt, run=run)
     else:
-        raise ValueError("Specify one of: snapshot, config")
+        raise ValueError("Specify one of: audit, config")

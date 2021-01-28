@@ -11,7 +11,7 @@ from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
 import pandas as pd
 
 
-class SnapshotDemo(FlowSpec):
+class AuditDemo(FlowSpec):
     read_run_id = Parameter(
         "read-run-id", help="Pass a run_id for a VersionDemo flow", required=True
     )
@@ -30,4 +30,4 @@ class SnapshotDemo(FlowSpec):
 
 
 if __name__ == "__main__":
-    SnapshotDemo()
+    AuditDemo()

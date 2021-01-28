@@ -6,9 +6,9 @@ The DoltDT provides two interfaces:
 
 1. One to access Dolt from a specific commit (`DoltBranchDT`)
 2. A second to access Dolt via the interactions performed by a
-  different Metaflow Run (`DoltSnapshotDT`).
+  different Metaflow Run (`DoltAuditDT`).
   
-<img src="./snapshot.jpg" width="700">
+<img src="./audit.jpg" width="650">
 
 Interface one pins workflow reads and writes
 from a common branch starting point. The easiest way to access data from
@@ -23,21 +23,21 @@ table, and write to new commits from the original parent commit.
 For example, reproducing a workflow that reads and writes from a single branch
 will reference two versions of the database -- the read and write commits.
 
-We have provided the `DoltSnapshotDT`, a read-only tool that
+We have provided the `DoltAuditDT`, a read-only tool that
 uses namespace keys to load the versions of tables used in previous
-workflows. You cannot write to a snapshot context manager because there
+workflows. You cannot write to a audit context manager because there
 is no default database configuration. Tablename key collisions will
 reference the most recently accessed version of the table, however this
-can be avoided by manually specifying the snapshot namespace key
+can be avoided by manually specifying the audit namespace key
 (example 4 below).
 
 The data structure that maintains the workflow namespace is created
 throughout running flows, and attached to Run objects as the `.dolt` metaflow artifact.
 This metaflow artifact can be accessed from the Metaflow client API in
 the same manner as other artifacts, and
-used to initialize a snapshot DT (example 2 below). A
-`DoltSnapshotDT` used during a running flow will maintain
-two snapshots -- one for reading data, and a second for recording what
+used to initialize a audit DT (example 2 below). A
+`DoltAuditDT` used during a running flow will maintain
+two audits -- one for reading data, and a second for recording what
 versions of data were accessed in the current flow for future
 reproducibility.
 
@@ -52,12 +52,12 @@ with DoltDT(run=self, config=conf) as dolt:
 - line 2: Dolt Datatool used similarly to S3 -- provide context manager to running flow
 - line 3: Dolt returns dataframe for table name
 - line 4: Dolt will stage a write to table `baz`
-- line 5: Context manager exits, record of reads/writes persisted to a snapshot for the run
+- line 5: Context manager exits, record of reads/writes persisted to a audit for the run
 
-Example 2 (`snahshot_demo.py`): reproducible snapshot
+Example 2: reproducible audit
 ```python3
-snapshot = Run("VersioningDemo/XX").data.dolt
-print(json.dumps(snapshot, indent=4))
+audit = Run("VersioningDemo/XX").data.dolt
+print(json.dumps(audit, indent=4))
 {
     "actions": {
         "bar": {
@@ -100,18 +100,18 @@ print(json.dumps(snapshot, indent=4))
 - action 2: we wrote table `baz` to database `foo` in commit `cldb7p`
 - config 1: we used one `DoltDT` with one database configuration
 
-Example 3 (snapshot_demo.py): reproducible workflows with snapshot encapsulation
+Example 3 (audit_demo.py): reproducible workflows with audit encapsulation
 ```python3
-snapshot = Run("VersioningDemo/XX").data.dolt
-dolt = DoltDT(run=self, snapshot=snapshot)
+audit = Run("VersioningDemo/XX").data.dolt
+dolt = DoltDT(run=self, audit=audit)
 df = dolt.read("bar")
 ```
-- line 1: load the dolt snapshot
-- line 2: use the dolt snapshot as a read replica
-- line 3: read the version of table `bar` specified in the snapshot namespace
-- note: if `DoltSnapshotDT` is used as a context manager durign an active flow,
-the configuration and read action from the reference snapshot would be saved into
-the running flow's snapshot
+- line 1: load the dolt audit
+- line 2: use the dolt audit as a read replica
+- line 3: read the version of table `bar` specified in the audit namespace
+- note: if `DoltAuditDT` is used as a context manager durign an active flow,
+the configuration and read action from the reference audit would be saved into
+the running flow's audit
 
 Example 4: overlapping reads
 ```python3
@@ -120,12 +120,12 @@ with DoltDT(run=self, config=conf1) as dolt:
 with DoltDT(run=self, config=conf2) as dolt:
     df2 = dolt.read("bar", as_key="bar2")
 ```
-- context 1: read table `bar` from configuration 1, with the snapshot
+- context 1: read table `bar` from configuration 1, with the audit
     namespace saving the read under key `bar1`
-- context 2: read table `bar` from configuration 2, with the snapshot
+- context 2: read table `bar` from configuration 2, with the audit
     namespace saving the read action under key `bar2`
 
-the resulting snapshot:
+the resulting audit:
 ```
 {
     "actions": {
