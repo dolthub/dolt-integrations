@@ -1,11 +1,12 @@
 import logging
+import json
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
 import pickle
 
-from metaflow import FlowSpec, step, Parameter
+from metaflow import FlowSpec, step, Parameter, Run
 from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
 import pandas as pd
 
@@ -21,12 +22,11 @@ class SnapshotDemo(FlowSpec):
         with DoltDT(run=self, snapshot=snapshot) as dolt:
             df = dolt.read("bar")
 
-        self.next(self.middle)
+        self.next(self.end)
 
     @step
     def end(self):
-        print(self.dolt)
-        self.next(self.end)
+        print(json.dumps(self.dolt, indent=4))
 
 
 if __name__ == "__main__":

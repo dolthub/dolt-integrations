@@ -66,7 +66,7 @@ class DoltConfig:
     commit: str = None
     dolthub_remote: bool = False
     push_on_commit: bool = False
-    # fully_qualified_name: str
+    # dolt_fqn: str
 
     def dict(self):
         return dict(
@@ -100,12 +100,6 @@ class DoltSnapshot(object):
         return cls(**json.loads(data))
 
 
-# TODO: expose other dolt functions?
-#   - dolt config
-#   - dolt log
-#   - dolt creds
-
-
 def runtime_only(f):
     @wraps(f)
     def inner(*args, **kwargs):
@@ -128,8 +122,12 @@ def snapshot_unsafe(f):
     return inner
 
 
-class DoltDTBase(object):
+class DoltBranchDT(object):
+
     def __init__(self, run: FlowSpec, config: DoltConfig):
+        """
+        Can read or write with Dolt, starting from a single reference commit.
+        """
 
         self._run = run
         if hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
@@ -170,17 +168,17 @@ class DoltDTBase(object):
 
         return
 
-    def read(self, tablename: str, as_key: Optional[str] = None):
+    def read(self, table_name: str, as_key: Optional[str] = None):
         action = DoltAction(
             kind="read",
-            key=as_key or key,
+            key=as_key or table_name,
             commit=self._config.commit,
+            query=f"SELECT * FROM `{table_name}`",
             config_id=self._config.id,
             pathspec=self._pathspec,
-            table_name=key,
+            table_name=table_name,
         )
-        table = self._execute_read_action(action, self._config)
-        return table
+        return self._execute_read_action(action, self._config)
 
     @snapshot_unsafe
     def sql(self, q: str, as_key: str):
@@ -193,9 +191,7 @@ class DoltDTBase(object):
             pathspec=self._pathspec,
             table_name=None,
         )
-        self._add_action(action)
-        db = self._get_db(self._config)
-        return read_table_sql(db, f'{q} AS OF "{action.commit}"')
+        return self._execute_read_action(action, self._config)
 
     @runtime_only
     @snapshot_unsafe
@@ -206,11 +202,12 @@ class DoltDTBase(object):
         pks: List[str] = None,
         as_key: str = None,
     ):
-        db = self._get_db(self._config)
         if not pks:
             df = df.reset_index()
             pks = df.columns
+        db = self._get_db(self._config)
         import_df(repo=db, table_name=table_name, data=df, primary_keys=pks)
+
         action = DoltAction(
             kind="write",
             key=table_name or key,
@@ -224,7 +221,7 @@ class DoltDTBase(object):
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
-        table = self._get_table_asof(db, action.table_name, action.commit)
+        table = read_table_sql(db, f'{action.query} AS OF "{action.commit}"')
         self._add_action(action)
         return table
 
@@ -301,17 +298,8 @@ class DoltDTBase(object):
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
-    def _get_table_asof(
-        self, dolt: Dolt, table_name: str, commit: str = None
-    ) -> pd.DataFrame:
-        base_query = f"SELECT * FROM `{table_name}`"
-        if commit:
-            return read_table_sql(dolt, f'{base_query} AS OF "{commit}"')
-        else:
-            return read_table_sql(dolt, base_query)
 
-
-class DoltSnapshotDT(DoltDTBase):
+class DoltSnapshotDT(DoltBranchDT):
     def __init__(self, snapshot: DoltSnapshot, run: Optional[FlowSpec]):
         """
         Can only read from a SnapshotDT, and reading is isolated to the snapshot.
@@ -328,31 +316,12 @@ class DoltSnapshotDT(DoltDTBase):
 
         action = snapshot_action.copy()
         action.key = as_key or key
-        action.kind = "read"
+        if action.kind != "read":
+            action.kind = "read"
+            action.query = action.query or f"SELECT * FROM `{action.table_name}`",
 
         config = self._sconfigs[action.config_id]
-        table = self._execute_read_action(action, config)
-        return table
-
-
-class DoltBranchDT(DoltDTBase):
-    def __init__(self, run: FlowSpec, config: DoltConfig):
-        """
-        Can read or write with Dolt, starting from a single reference commit.
-        """
-        super().__init__(run=run, config=config)
-
-    def read(self, key: str, as_key: Optional[str] = None):
-        action = DoltAction(
-            kind="read",
-            key=as_key or key,
-            commit=self._config.commit,
-            config_id=self._config.id,
-            pathspec=self._pathspec,
-            table_name=key,
-        )
-        table = self._execute_read_action(action, self._config)
-        return table
+        return self._execute_read_action(action, config)
 
 
 def DoltDT(

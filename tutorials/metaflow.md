@@ -41,7 +41,7 @@ two snapshots -- one for reading data, and a second for recording what
 versions of data were accessed in the current flow for future
 reproducibility.
 
-Example 1 (demo.py): read from Dolt database
+Example 1 (`demo.py`): read from Dolt database
 ```python3
 conf = DoltConfig(database="foo")
 with DoltDT(run=self, config=conf) as dolt:
@@ -54,7 +54,7 @@ with DoltDT(run=self, config=conf) as dolt:
 - line 4: Dolt will stage a write to table `baz`
 - line 5: Context manager exits, record of reads/writes persisted to a snapshot for the run
 
-Example 2: reproducible snapshot
+Example 2 (`snahshot_demo.py`): reproducible snapshot
 ```python3
 snapshot = Run("VersioningDemo/XX").data.dolt
 print(json.dumps(snapshot, indent=4))
@@ -66,7 +66,7 @@ print(json.dumps(snapshot, indent=4))
             "pathspec": "VersioningDemo/1611689861614781/start/1",
             "table_name": "bar",
             "kind": "read",
-            "query": null,
+            "query": "SELECT * FROM `bar`",
             "commit": "v51ahsc6i6afphhc5q9uub7fjcq2sta4",
             "artifact_name": null,
             "timestamp": 1611689862.785563
@@ -139,10 +139,10 @@ the resulting snapshot:
          ...
 ```
 
-Example 5 (in progress): custom SQL select
+Example 5 (`custom_query_demo.py`): custom SQL select
 ```python3
 with DoltDT(run=self, config=conf) as dolt:
-    df1 = dolt.select(q="SELECT * from table LIMIT 5;", as_key="first_five")
+    df1 = dolt.select(q="SELECT * from `table` LIMIT 5;", as_key="first_five")
 ```
 - manually specify a SQL select; `as_key` is required
 
@@ -154,7 +154,7 @@ resulting action:
     "pathspec": "VersioningDemo/1611689861614781/start/1",
     "table_name": None,
     "kind": "read",
-    "query": "SELECT * from table LIMIT 5;",
+    "query": "SELECT * from `table` LIMIT 5;",
     "commit": "cldb7pohk69fic3s96de2r3okananr5n",
     "artifact_name": null,
     "timestamp": 1611689863.4338062
