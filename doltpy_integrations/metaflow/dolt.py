@@ -122,14 +122,16 @@ def audit_unsafe(f):
     return inner
 
 
-class DoltBranchDT(object):
+class DoltDTBase(object):
 
-    def __init__(self, run: FlowSpec, config: DoltConfig):
+    def __init__(self, run: Optional[FlowSpec], config: Optional[DoltConfig] = None):
         """
         Can read or write with Dolt, starting from a single reference commit.
         """
 
         self._run = run
+        if not self._run:
+            self._dolt = DoltAudit().dict()
         if hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
             self._dolt = self._run.data.dolt
         elif hasattr(self._run, "dolt"):
@@ -148,13 +150,12 @@ class DoltBranchDT(object):
         self._new_actions = {}  # keep track of write state to commit at end
         self._pending_writes = []
 
-        self._get_db(self._config)
-
     def __enter__(self):
         from metaflow import current
 
+        print("current", current.is_running_flow)
         if not current.is_running_flow:
-            Exception("Context manager only usable while running flows")
+            raise ValueError("Context manager only usable while running flows")
         self._start_run_attributes = set(vars(self._run).keys())
         return self
 
@@ -277,6 +278,7 @@ class DoltBranchDT(object):
             pass
 
         if not doltdb.status().is_clean:
+            print(doltdb.execute(["status"]))
             raise Exception(
                 "DoltDT as context manager requires clean working set for transaction semantics"
             )
@@ -298,13 +300,18 @@ class DoltBranchDT(object):
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
+class DoltBranchDT(DoltDTBase):
 
-class DoltAuditDT(DoltBranchDT):
-    def __init__(self, audit: DoltAudit, run: Optional[FlowSpec]):
+    def __init__(self, run: FlowSpec, config: DoltConfig):
+        super().__init__(run=run, config=config)
+        self._get_db(self._config)
+
+class DoltAuditDT(DoltDTBase):
+    def __init__(self, audit: dict, run: Optional[FlowSpec] = None):
         """
         Can only read from a AuditDT, and reading is isolated to the audit.
         """
-        super().__init__(run=run, config=DoltConfig())
+        super().__init__(run=run)
         self._read_audit = audit
         self._sactions = {k: DoltAction(**v) for k, v in audit["actions"].items()}
         self._sconfigs = {k: DoltConfig(**v) for k, v in audit["configs"].items()}
