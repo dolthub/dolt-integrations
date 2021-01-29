@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from functools import wraps
+import hashlib
 import json
 import os
 import time
@@ -149,6 +150,7 @@ class DoltDTBase(object):
         self._dbcache = {}  # configid -> Dolt instance
         self._new_actions = {}  # keep track of write state to commit at end
         self._pending_writes = []
+        self._dolt_marked = {}
 
     def __enter__(self):
         from metaflow import current
@@ -160,14 +162,26 @@ class DoltDTBase(object):
         return self
 
     def __exit__(self, *args, allow_empty: bool = True):
-        # TODO: how to associate new variables with dolt actions?
-        new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
-
         if self._new_actions:
+            self._reverse_object_action_marks()
             self._commit_actions()
             self._update_dolt_artifact()
 
         return
+
+    @runtime_only
+    def _reverse_object_action_marks(self):
+        new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
+        print("new_attributes", new_attributes)
+        for a in new_attributes:
+            obj = getattr(self._run, a, None)
+            print("get obj", obj)
+            h = self._hash_object(obj)
+            key = self._dolt_marked.get(h, None)
+            print(h, self._dolt_marked)
+            if key and key in self._new_actions:
+                self._new_actions[key].artifact_name = a
+
 
     def read(self, table_name: str, as_key: Optional[str] = None):
         action = DoltAction(
@@ -218,12 +232,14 @@ class DoltDTBase(object):
             table_name=table_name,
         )
         self._add_action(action)
+        self._mark_object(df, action)
         return
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
         table = read_table_sql(db, f'{action.query} AS OF "{action.commit}"')
         self._add_action(action)
+        self._mark_object(table, action)
         return table
 
     @runtime_only
@@ -236,6 +252,17 @@ class DoltDTBase(object):
 
         self._new_actions[action.key] = action
         return
+
+    def _hash_object(self, obj):
+        if isinstance(obj, pd.DataFrame):
+            h = hashlib.sha256(pd.util.hash_pandas_object(obj, index=True).values).hexdigest()
+        else:
+            h = hash(obj)
+        return h
+
+    @runtime_only
+    def _mark_object(self, obj, action: DoltAction):
+        self._dolt_marked[self._hash_object(obj)] = action.key
 
     @runtime_only
     @audit_unsafe
