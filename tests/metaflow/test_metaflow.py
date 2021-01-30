@@ -32,6 +32,8 @@ def test_branchdt_cm_read(active_run, dolt_config):
     np.testing.assert_array_equal(df.A.values, ["1","1","1"])
     audit = active_run.dolt
     assert "bar" in audit["actions"]
+    assert audit["actions"]["bar"]["kind"] == "read"
+    assert audit["actions"]["bar"]["query"] == "SELECT * FROM `bar`"
 
 def test_branchdt_standalone_init(inactive_run, dolt_config):
     dolt = DoltDT(config=dolt_config)
@@ -49,8 +51,8 @@ def test_auditdt_standalone_read(active_run, dolt_audit1):
 
 # branch write success
 def test_branchdt_cm_write(active_run, dolt_config, doltdb):
+    input_df = pd.DataFrame({"A": [2, 2, 2], "B": [2, 2, 2]})
     with DoltDT(run=active_run, config=dolt_config) as dolt:
-        input_df = pd.DataFrame({"A": [2, 2, 2], "B": [2, 2, 2]})
         dolt.write(df=input_df, table_name="baz")
 
     db = Dolt(doltdb)
@@ -64,6 +66,19 @@ def test_branchdt_cm_write(active_run, dolt_config, doltdb):
     assert audit["actions"]["baz"]["query"] == "SELECT * FROM `baz`"
 
 
-# standalone write failures
+@pytest.mark.xfail
+def test_branchdt_standalone_inactive_write(inactive_run, dolt_config):
+    dolt = DoltDT(config=dolt_config)
+    input_df = pd.DataFrame({"A": [2, 2, 2], "B": [2, 2, 2]})
+    dolt.write(df=input_df, table_name="baz")
 
-# audit write failure
+
+@pytest.mark.xfail
+def test_auditdt_cm_write(active_run, dolt_audit1):
+    input_df = pd.DataFrame({"A": [2, 2, 2], "B": [2, 2, 2]})
+    with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
+        dolt.write(df=input_df, table_name="baz")
+
+# test name reference
+
+# test custom query

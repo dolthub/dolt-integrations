@@ -107,7 +107,8 @@ def runtime_only(f):
         from metaflow import current
 
         if not current.is_running_flow:
-            return
+            raise ValueError(f"Action only permitted during running flow: {repr(f)}")
+
         return f(*args, **kwargs)
 
     return inner
@@ -117,7 +118,7 @@ def audit_unsafe(f):
     @wraps(f)
     def inner(*args, **kwargs):
         if isinstance(args[0], DoltAuditDT):
-            return
+            raise ValueError(f"Action only permitted using branch mode: {repr(f)}")
         return f(*args, **kwargs)
 
     return inner
