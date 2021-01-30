@@ -79,6 +79,18 @@ def test_auditdt_cm_write(active_run, dolt_audit1):
     with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
         dolt.write(df=input_df, table_name="baz")
 
-# test name reference
+def test_artifact_reference(active_run, dolt_config):
+    with DoltDT(run=active_run, config=dolt_config) as dolt:
+        active_run.df = dolt.read("bar")
+    audit = active_run.dolt
+    assert "bar" in audit["actions"]
+    assert audit["actions"]["bar"]["artifact_name"] == "df"
 
-# test custom query
+def test_custom_query_branch(active_run, dolt_config):
+    with DoltDT(run=active_run, config=dolt_config) as dolt:
+        df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
+    np.testing.assert_array_equal(df.A.values, ["1", "1", "1"])
+    audit = active_run.dolt
+    assert "akey" in audit["actions"]
+    assert audit["actions"]["akey"]["kind"] == "read"
+    assert audit["actions"]["akey"]["query"] == "SELECT * FROM `bar`"
