@@ -133,7 +133,7 @@ class DoltDTBase(object):
         self._run = run
         if not self._run:
             self._dolt = DoltAudit().dict()
-        if hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
+        elif hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
             self._dolt = self._run.data.dolt
         elif hasattr(self._run, "dolt"):
             self._dolt = self._run.dolt
@@ -228,6 +228,7 @@ class DoltDTBase(object):
             key=table_name or key,
             commit=None,
             config_id=self._config.id,
+            query=f"SELECT * FROM `{table_name}`",
             pathspec=self._pathspec,
             table_name=table_name,
         )

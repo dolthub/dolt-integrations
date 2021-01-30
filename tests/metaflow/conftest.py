@@ -10,17 +10,20 @@ import pytest
 from doltpy_integrations.metaflow import DoltDT, DoltConfig
 
 @pytest.fixture(scope="function")
-def dolt_audit1():
+def dolt_audit1(doltdb):
+    db = Dolt(doltdb)
+    lg = db.log()
+    commit = lg.popitem(last=False)[0]
     yield {
         "actions": {
             "bar": {
                 "key": "bar",
-                "config_id": "88a0513f-6310-48e3-b403-af909de4b2b8",
+                "config_id": "dd9f1f38-6802-4657-b869-602dde993180",
                 "pathspec": "VersioningDemo/1611853111934656/start/1",
                 "table_name": "bar",
                 "kind": "read",
                 "query": "SELECT * FROM `bar`",
-                "commit": "hupehmg3q5hqqb56vjigfn3kuei0s41m",
+                "commit": commit,
                 "artifact_name": None,
                 "timestamp": 1611853112.794624
             }
@@ -28,9 +31,9 @@ def dolt_audit1():
         "configs": {
             "dd9f1f38-6802-4657-b869-602dde993180": {
                 "id": "dd9f1f38-6802-4657-b869-602dde993180",
-                "database": "foo",
+                "database": doltdb,
                 "branch": "master",
-                "commit": "7o48tp7lhcgh96fc1urjni2h6uhi933g",
+                "commit": commit,
                 "dolthub_remote": False,
                 "push_on_commit": False
             }
