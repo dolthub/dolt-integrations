@@ -1,6 +1,6 @@
-from doltpy.core import Dolt
-from doltpy.core.read import read_table_sql
-from doltpy.core.write import import_df
+from doltpy.cli import Dolt
+from doltpy.cli.read import read_pandas_sql
+from doltpy.cli.write import write_pandas
 import metaflow
 import numpy as np
 import pandas as pd
@@ -56,7 +56,7 @@ def test_branchdt_cm_write(active_run, dolt_config, doltdb):
         dolt.write(df=input_df, table_name="baz")
 
     db = Dolt(doltdb)
-    output_df = read_table_sql(db, "SELECT * from `baz`")
+    output_df = read_pandas_sql(db, "SELECT * from `baz`")
     np.testing.assert_array_equal(output_df.A.values, ["2","2","2"])
 
     audit = active_run.dolt

@@ -1,8 +1,8 @@
 import os
 import shutil
 
-from doltpy.core import Dolt
-from doltpy.core.write import import_df
+from doltpy.cli import Dolt
+from doltpy.cli.write import write_pandas
 import metaflow
 import pandas as pd
 import pytest
@@ -51,7 +51,7 @@ def doltdb():
         db = Dolt.init(db_path)
         print(db_path)
         df_v1 = pd.DataFrame({"A": [1, 1, 1], "B": [1, 1, 1]})
-        import_df(db, "bar", df_v1.reset_index(), ["index"], "create")
+        write_pandas(dolt=db, table="bar", df=df_v1.reset_index(), primary_key=["index"], import_mode="create")
         db.add("bar")
         db.commit("Initialize bar")
         yield db_path

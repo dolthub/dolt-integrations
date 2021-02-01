@@ -10,11 +10,10 @@ import uuid
 
 import pandas as pd
 
-from doltpy.core import Dolt
-from doltpy.core.write import import_df
-from doltpy.core.dolt import DoltException
-from doltpy.core.read import read_table
-from doltpy.core.read import read_table_sql
+from doltpy.cli import Dolt
+from doltpy.cli.write import write_pandas
+from doltpy.cli.dolt import DoltException
+from doltpy.cli.read import read_pandas_sql
 from metaflow import FlowSpec, Run, current
 
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"
@@ -220,9 +219,9 @@ class DoltDTBase(object):
     ):
         if not pks:
             df = df.reset_index()
-            pks = df.columns
+            pks = list(df.columns)
         db = self._get_db(self._config)
-        import_df(repo=db, table_name=table_name, data=df, primary_keys=pks)
+        write_pandas(dolt=db, table=table_name, df=df, primary_key=pks)
 
         action = DoltAction(
             kind="write",
@@ -239,7 +238,7 @@ class DoltDTBase(object):
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
-        table = read_table_sql(db, f'{action.query} AS OF "{action.commit}"')
+        table = read_pandas_sql(db, f'{action.query} AS OF "{action.commit}"')
         self._add_action(action)
         self._mark_object(table, action)
         return table
