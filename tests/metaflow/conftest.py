@@ -49,7 +49,6 @@ def doltdb():
     db_path = os.path.join(os.path.dirname(__file__), "foo")
     try:
         db = Dolt.init(db_path)
-        print(db_path)
         df_v1 = pd.DataFrame({"A": [1, 1, 1], "B": [1, 1, 1]})
         write_pandas(dolt=db, table="bar", df=df_v1.reset_index(), primary_key=["index"], import_mode="create")
         db.add("bar")

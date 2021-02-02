@@ -94,3 +94,31 @@ def test_custom_query_branch(active_run, dolt_config):
     assert "akey" in audit["actions"]
     assert audit["actions"]["akey"]["kind"] == "read"
     assert audit["actions"]["akey"]["query"] == "SELECT * FROM `bar`"
+
+@pytest.mark.xfail
+def test_auditdt_cm_query(active_run, dolt_audit1):
+    with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
+        df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
+
+def test_branchdt_diff(inactive_run, dolt_config, doltdb):
+    doltdb = Dolt(doltdb)
+    logs = list(doltdb.log(2).keys())
+
+    dolt = DoltDT(config=dolt_config)
+    diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
+
+    row = diff["bar"].iloc[0]
+    assert row.from_A == ""
+    assert row.from_B == ""
+    assert row.to_A == "1"
+    assert row.to_B == "1"
+
+@pytest.mark.xfail
+def test_auditdt_cm_diff(active_run, dolt_audit1, doltdb):
+    doltdb = Dolt(doltdb)
+    logs = list(doltdb.log(2).keys())
+
+    with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
+        df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
+        diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
+

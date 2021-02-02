@@ -155,7 +155,6 @@ class DoltDTBase(object):
     def __enter__(self):
         from metaflow import current
 
-        print("current", current.is_running_flow)
         if not current.is_running_flow:
             raise ValueError("Context manager only usable while running flows")
         self._start_run_attributes = set(vars(self._run).keys())
@@ -172,13 +171,10 @@ class DoltDTBase(object):
     @runtime_only
     def _reverse_object_action_marks(self):
         new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
-        print("new_attributes", new_attributes)
         for a in new_attributes:
             obj = getattr(self._run, a, None)
-            print("get obj", obj)
             h = self._hash_object(obj)
             key = self._dolt_marked.get(h, None)
-            print(h, self._dolt_marked)
             if key and key in self._new_actions:
                 self._new_actions[key].artifact_name = a
 
@@ -235,6 +231,31 @@ class DoltDTBase(object):
         self._add_action(action)
         self._mark_object(df, action)
         return
+
+    @audit_unsafe
+    def diff(
+        self,
+        from_commit: str,
+        to_commit: str,
+        table: Union[str, List[str]]
+    ) -> Dict[str, pd.DataFrame]:
+        def get_query(table: str) -> str:
+            return f"""
+                SELECT
+                    *
+                FROM
+                    dolt_diff_{table}
+                WHERE
+                    from_commit = '{from_commit}'
+                    AND to_COMMIT = '{to_commit}'
+            """
+
+        db = self._get_db(self._config)
+        tables = [table] if isinstance(table, str) else table
+        result = {table: read_pandas_sql(db, get_query(table)) for table in tables}
+        print(result)
+
+        return result
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
@@ -306,7 +327,6 @@ class DoltDTBase(object):
             pass
 
         if not doltdb.status().is_clean:
-            print(doltdb.execute(["status"]))
             raise Exception(
                 "DoltDT as context manager requires clean working set for transaction semantics"
             )
