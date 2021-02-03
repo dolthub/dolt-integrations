@@ -253,16 +253,22 @@ class DoltDTBase(object):
         db = self._get_db(self._config)
         tables = [table] if isinstance(table, str) else table
         result = {table: read_pandas_sql(db, get_query(table)) for table in tables}
-        print(result)
-
         return result
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
-        table = read_pandas_sql(db, f'{action.query} AS OF "{action.commit}"')
-        self._add_action(action)
-        self._mark_object(table, action)
-        return table
+        starting_commit = self._get_latest_commit_hash(db)
+        try:
+            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{action.commit}'")
+            table = read_pandas_sql(db, action.query)
+            self._add_action(action)
+            self._mark_object(table, action)
+            return table
+        except Exception as e:
+            raise e
+        finally:
+            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{starting_commit}'")
+
 
     @runtime_only
     def _add_action(self, action: DoltAction):

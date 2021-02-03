@@ -53,6 +53,11 @@ def doltdb():
         write_pandas(dolt=db, table="bar", df=df_v1.reset_index(), primary_key=["index"], import_mode="create")
         db.add("bar")
         db.commit("Initialize bar")
+
+        df_v2 = pd.DataFrame({"A": [2, 2, 2], "B": [2, 2, 2]})
+        write_pandas(dolt=db, table="bar", df=df_v2.reset_index(), primary_key=["index"], import_mode="create")
+        db.add("bar")
+        db.commit("Edit bar")
         yield db_path
     finally:
         if os.path.exists(db_path):

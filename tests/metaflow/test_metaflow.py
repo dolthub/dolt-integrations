@@ -29,7 +29,7 @@ def test_auditdt_cm_init_inactive(inactive_run, dolt_audit1):
 def test_branchdt_cm_read(active_run, dolt_config):
     with DoltDT(run=active_run, config=dolt_config) as dolt:
         df = dolt.read("bar")
-    np.testing.assert_array_equal(df.A.values, ["1","1","1"])
+    np.testing.assert_array_equal(df.A.values, ["2","2","2"])
     audit = active_run.dolt
     assert "bar" in audit["actions"]
     assert audit["actions"]["bar"]["kind"] == "read"
@@ -86,14 +86,18 @@ def test_artifact_reference(active_run, dolt_config):
     assert "bar" in audit["actions"]
     assert audit["actions"]["bar"]["artifact_name"] == "df"
 
-def test_custom_query_branch(active_run, dolt_config):
+def test_custom_query_branch(active_run, dolt_config, doltdb):
+    doltdb = Dolt(doltdb)
+    logs = list(doltdb.log(2).keys())
+    dolt_config.commit = logs[1]
+
     with DoltDT(run=active_run, config=dolt_config) as dolt:
-        df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
-    np.testing.assert_array_equal(df.A.values, ["1", "1", "1"])
+        df = dolt.sql("SELECT * FROM `bar` LIMIT 2", as_key="akey")
+    np.testing.assert_array_equal(df.A.values, ["1", "1"])
     audit = active_run.dolt
     assert "akey" in audit["actions"]
     assert audit["actions"]["akey"]["kind"] == "read"
-    assert audit["actions"]["akey"]["query"] == "SELECT * FROM `bar`"
+    assert audit["actions"]["akey"]["query"] == "SELECT * FROM `bar` LIMIT 2"
 
 @pytest.mark.xfail
 def test_auditdt_cm_query(active_run, dolt_audit1):
@@ -108,10 +112,10 @@ def test_branchdt_diff(inactive_run, dolt_config, doltdb):
     diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
 
     row = diff["bar"].iloc[0]
-    assert row.from_A == ""
-    assert row.from_B == ""
-    assert row.to_A == "1"
-    assert row.to_B == "1"
+    assert row.from_A == "1"
+    assert row.from_B == "1"
+    assert row.to_A == "2"
+    assert row.to_B == "2"
 
 @pytest.mark.xfail
 def test_auditdt_cm_diff(active_run, dolt_audit1, doltdb):
@@ -121,4 +125,3 @@ def test_auditdt_cm_diff(active_run, dolt_audit1, doltdb):
     with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
         df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
         diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
-
