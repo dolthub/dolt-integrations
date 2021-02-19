@@ -23,7 +23,7 @@ reproducibility. The Metaflow Client API allows users to access and compare
 these data and code artifacts afterwards using the Metaflow namespace hierarchy.
 
 <p align="center">
-  <img src="../tutorials/static/metaflow.png" width="450">
+  <img src="../../tutorials/static/metaflow.png" width="450">
 </p>
 
 ## Integration Architecture
@@ -43,7 +43,7 @@ that automatically handle behind-the-scenes managing of Dolt "audits":
   Run (`DoltAuditDT`).
   
 <p align="center">
-  <img src="../tutorials/static/audit.jpg" width="650">
+  <img src="../../tutorials/static/audit.jpg" width="650">
 </p>
 
 Interface one pins workflow reads and writes
