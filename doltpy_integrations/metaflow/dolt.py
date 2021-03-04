@@ -163,7 +163,8 @@ class DoltDTBase(object):
     def __exit__(self, *args, allow_empty: bool = True):
         if self._new_actions:
             self._reverse_object_action_marks()
-            self._commit_actions()
+            if not isinstance(self, DoltAuditDT):
+                self._commit_actions()
             self._update_dolt_artifact()
 
         return
@@ -258,8 +259,9 @@ class DoltDTBase(object):
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
         starting_commit = self._get_latest_commit_hash(db)
+        lowercase_dbname = os.path.join(config.database).replace("-", "_")
         try:
-            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{action.commit}'")
+            db.sql(query=f"set `@@{lowercase_dbname}_head` = '{action.commit}'")
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
             self._mark_object(table, action)
@@ -267,7 +269,7 @@ class DoltDTBase(object):
         except Exception as e:
             raise e
         finally:
-            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{starting_commit}'")
+            db.sql(query=f"set `@@{lowercase_dbname}_head` = '{starting_commit}'")
 
 
     @runtime_only
