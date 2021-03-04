@@ -27,7 +27,7 @@ class Flow2(FlowSpec):
 
         age.age = age.age.astype(float)
         prices.price = prices.price.astype(float)
-        prices = prices[prices.price < 90000000]
+        prices = prices[prices.price < 300000]
         df = age.set_index("state").join(prices.set_index("state")).dropna()
 
         chart = alt.Chart(df).mark_point().encode(
