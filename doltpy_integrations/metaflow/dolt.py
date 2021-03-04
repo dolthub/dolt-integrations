@@ -10,11 +10,10 @@ import uuid
 
 import pandas as pd
 
-from doltpy.core import Dolt
-from doltpy.core.write import import_df
-from doltpy.core.dolt import DoltException
-from doltpy.core.read import read_table
-from doltpy.core.read import read_table_sql
+from doltpy.cli import Dolt
+from doltpy.cli.write import write_pandas
+from doltpy.cli.dolt import DoltException
+from doltpy.cli.read import read_pandas_sql
 from metaflow import FlowSpec, Run, current
 
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"
@@ -107,7 +106,8 @@ def runtime_only(f):
         from metaflow import current
 
         if not current.is_running_flow:
-            return
+            raise ValueError(f"Action only permitted during running flow: {repr(f)}")
+
         return f(*args, **kwargs)
 
     return inner
@@ -117,21 +117,23 @@ def audit_unsafe(f):
     @wraps(f)
     def inner(*args, **kwargs):
         if isinstance(args[0], DoltAuditDT):
-            return
+            raise ValueError(f"Action only permitted using branch mode: {repr(f)}")
         return f(*args, **kwargs)
 
     return inner
 
 
-class DoltBranchDT(object):
+class DoltDTBase(object):
 
-    def __init__(self, run: FlowSpec, config: DoltConfig):
+    def __init__(self, run: Optional[FlowSpec], config: Optional[DoltConfig] = None):
         """
         Can read or write with Dolt, starting from a single reference commit.
         """
 
         self._run = run
-        if hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
+        if not self._run:
+            self._dolt = DoltAudit().dict()
+        elif hasattr(self._run, "data") and hasattr(self._run.data, "dolt"):
             self._dolt = self._run.data.dolt
         elif hasattr(self._run, "dolt"):
             self._dolt = self._run.dolt
@@ -150,13 +152,11 @@ class DoltBranchDT(object):
         self._pending_writes = []
         self._dolt_marked = {}
 
-        self._get_db(self._config)
-
     def __enter__(self):
         from metaflow import current
 
         if not current.is_running_flow:
-            Exception("Context manager only usable while running flows")
+            raise ValueError("Context manager only usable while running flows")
         self._start_run_attributes = set(vars(self._run).keys())
         return self
 
@@ -171,13 +171,10 @@ class DoltBranchDT(object):
     @runtime_only
     def _reverse_object_action_marks(self):
         new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
-        print("new_attributes", new_attributes)
         for a in new_attributes:
             obj = getattr(self._run, a, None)
-            print("get obj", obj)
             h = self._hash_object(obj)
             key = self._dolt_marked.get(h, None)
-            print(h, self._dolt_marked)
             if key and key in self._new_actions:
                 self._new_actions[key].artifact_name = a
 
@@ -218,15 +215,16 @@ class DoltBranchDT(object):
     ):
         if not pks:
             df = df.reset_index()
-            pks = df.columns
+            pks = list(df.columns)
         db = self._get_db(self._config)
-        import_df(repo=db, table_name=table_name, data=df, primary_keys=pks)
+        write_pandas(dolt=db, table=table_name, df=df, primary_key=pks)
 
         action = DoltAction(
             kind="write",
             key=table_name or key,
             commit=None,
             config_id=self._config.id,
+            query=f"SELECT * FROM `{table_name}`",
             pathspec=self._pathspec,
             table_name=table_name,
         )
@@ -234,12 +232,43 @@ class DoltBranchDT(object):
         self._mark_object(df, action)
         return
 
+    @audit_unsafe
+    def diff(
+        self,
+        from_commit: str,
+        to_commit: str,
+        table: Union[str, List[str]]
+    ) -> Dict[str, pd.DataFrame]:
+        def get_query(table: str) -> str:
+            return f"""
+                SELECT
+                    *
+                FROM
+                    dolt_diff_{table}
+                WHERE
+                    from_commit = '{from_commit}'
+                    AND to_COMMIT = '{to_commit}'
+            """
+
+        db = self._get_db(self._config)
+        tables = [table] if isinstance(table, str) else table
+        result = {table: read_pandas_sql(db, get_query(table)) for table in tables}
+        return result
+
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
-        table = read_table_sql(db, f'{action.query} AS OF "{action.commit}"')
-        self._add_action(action)
-        self._mark_object(table, action)
-        return table
+        starting_commit = self._get_latest_commit_hash(db)
+        try:
+            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{action.commit}'")
+            table = read_pandas_sql(db, action.query)
+            self._add_action(action)
+            self._mark_object(table, action)
+            return table
+        except Exception as e:
+            raise e
+        finally:
+            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{starting_commit}'")
+
 
     @runtime_only
     def _add_action(self, action: DoltAction):
@@ -325,13 +354,18 @@ class DoltBranchDT(object):
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
+class DoltBranchDT(DoltDTBase):
 
-class DoltAuditDT(DoltBranchDT):
-    def __init__(self, audit: DoltAudit, run: Optional[FlowSpec]):
+    def __init__(self, run: FlowSpec, config: DoltConfig):
+        super().__init__(run=run, config=config)
+        self._get_db(self._config)
+
+class DoltAuditDT(DoltDTBase):
+    def __init__(self, audit: dict, run: Optional[FlowSpec] = None):
         """
         Can only read from a AuditDT, and reading is isolated to the audit.
         """
-        super().__init__(run=run, config=DoltConfig())
+        super().__init__(run=run)
         self._read_audit = audit
         self._sactions = {k: DoltAction(**v) for k, v in audit["actions"].items()}
         self._sconfigs = {k: DoltConfig(**v) for k, v in audit["configs"].items()}

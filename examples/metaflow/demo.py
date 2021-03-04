@@ -10,8 +10,6 @@ from metaflow import FlowSpec, step, Parameter
 from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
 import pandas as pd
 
-# from sklearn import tree
-
 
 class VersioningDemo(FlowSpec):
     @step

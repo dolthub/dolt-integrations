@@ -1,0 +1,57 @@
+name: Doltpy-integration Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - uses: Gr1N/setup-poetry@v4
+      - uses: actions/cache@v1
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+      - name: Install dependencies
+        run: poetry install
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      - name: Install Dolt
+        run: |
+          sudo curl -L https://github.com/liquidata-inc/dolt/releases/latest/download/install.sh | sudo bash
+          dolt config --global --add user.email bojack@horseman.com
+          dolt config --global --add user.name "Bojack Horseman"
+          dolt config --global --add metrics.host eventsapi.awsdev.ld-corp.com
+          dolt config --global --add metrics.port 443
+      - name: Execute pytest
+        run: poetry run pytest --cov=doltpy_integrations --cov-report=term --cov-report xml
+      - uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          #files: ./coverage1.xml,./coverage2.xml # optional
+          #flags: unittests # optional
+          name: codecov-umbrella # optional
+          fail_ci_if_error: true # optional (default = false)
+          verbose: true # optional (default = false)
+      - name: Execute black
+        run: poetry run black -t py37
+      #- name: Execute mypy
+        #run: poetry run mypy doltpy
+      #- name: Check lockfile
+        #run: poetry lock & git diff --exit-code poetry.lock
+      #- name: Discord Notify
+        #if: always()
+        #uses: dolthub/ga-discord-notify@master
+        #with:
+          #job-status: ${{ job.status }}
+          #webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+          #notify-on-success: false

@@ -41,7 +41,7 @@ that automatically handle behind-the-scenes managing of Dolt "audits":
 1. Acess Dolt tables pinned to a specific branch or commit (`DoltBranchDT`)
 2. Access the versions of Dolt tables used in a different Metaflow
   Run (`DoltAuditDT`).
-  
+
 <p align="center">
   <img src="./static/audit.jpg" width="650">
 </p>
@@ -180,7 +180,7 @@ the resulting audit:
 Example 5 (`custom_query_demo.py`): custom SQL select
 ```python3
 with DoltDT(run=self, config=conf) as dolt:
-    df1 = dolt.select(q="SELECT * from `table` LIMIT 5;", as_key="first_five")
+    df1 = dolt.sql(q="SELECT * from `table`", as_key="first_five")
 ```
 - manually specify a SQL select; `as_key` is required
 
@@ -192,56 +192,14 @@ resulting action:
     "pathspec": "VersioningDemo/1611689861614781/start/1",
     "table_name": None,
     "kind": "read",
-    "query": "SELECT * from `table` LIMIT 5;",
+    "query": "SELECT * from `table`",
     "commit": "cldb7pohk69fic3s96de2r3okananr5n",
     "artifact_name": null,
     "timestamp": 1611689863.4338062
 }
 ```
 
-Example 6 (in progress): DoltHub remote:
-```python3
-conf = DoltConfig(database="dolthub/doltpy", dolthub_remote=True)
-with DoltDT(run=self, config=conf) as dolt:
-    df = dolt.read("bar")
-```
-- automatically pull remote repos locally
-- optionally push on commit
-
-Example 7 (in progress): diffs
-```python3
-dolt = DoltDT(config=conf)
-diff = dolt.diff(table="bar", other="master")
-print(diff)
->
-CREATE TABLE `bar` (
-  `index` int unsigned NOT NULL,
-  `A` int unsigned NOT NULL,
-  `B` int unsigned NOT NULL,
-  PRIMARY KEY (`index`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (0,1,1);
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (1,1,1);
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (2,1,1);
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (3,2,2);
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (4,2,2);
-INSERT INTO `bar` (`index`,`A`,`B`) VALUES (5,2,2);
-CREATE TABLE `baz` (
-  `level_0` int unsigned NOT NULL,
-  `index` int unsigned NOT NULL,
-  `A` int unsigned NOT NULL,
-  `B` int unsigned NOT NULL,
-  PRIMARY KEY (`level_0`,`index`,`A`,`B`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (0,0,1,1);
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (1,1,1,1);
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (2,2,1,1);
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (3,3,2,2);
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (4,4,2,2);
-INSERT INTO `baz` (`level_0`,`index`,`A`,`B`) VALUES (5,5,2,2);
-```
-
-Example 8 (in progress): trace artifact names in Dolt
+Example 6 (`askey_demo.py`): trace artifact names in Dolt
 ```python3
 with DoltDT(run=self, config=conf) as dolt:
     self.df = dolt.read("bar")
@@ -264,9 +222,39 @@ resulting action:
 }
 ```
 
+Example 7: diffs
+```python3
+dolt = DoltDT(config=conf)
+diff = dolt.diff(
+    from_commit="v8al1i9au4rckjna1qhsia7ild4dqrg9",
+    to_commit="30mibpd4987cokkd6hrph5u0hjnt50ne",
+    table="bar")
+
+print(diff["bar"].iloc[0])
+>
+to_A                                                1
+to_B                                                1
+to_index                                            0
+to_commit            30mibpd4987cokkd6hrph5u0hjnt50ne
+to_commit_date      2021-02-02 17:48:00.342 +0000 UTC
+from_A
+from_B
+from_index
+from_commit          v8al1i9au4rckjna1qhsia7ild4dqrg9
+from_commit_date    2021-02-02 17:48:00.121 +0000 UTC
+diff_type                                       added
+Name: 0, dtype: object
+```
+
+Example 8 (in progress): DoltHub remote:
+```python3
+conf = DoltConfig(database="dolthub/doltpy", dolthub_remote=True)
+with DoltDT(run=self, config=conf) as dolt:
+    df = dolt.read("bar")
+```
+- automatically pull remote repos locally
+- optionally push on commit
+
 TODO:
-1. Diffing
-2. Record query strings, allow dolt.query
-2. Bidirection metadata -- Dolt action references the metaflow artifact name
-2. Bidirectional discovery -- search for flows/users with DoltSQL
+1. Bidirectional discovery -- search for flows/users with DoltSQL
 2. Dolthub pulling/pushing easier -- fully qualified name, push on commit
