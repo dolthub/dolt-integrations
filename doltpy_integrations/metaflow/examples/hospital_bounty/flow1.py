@@ -44,7 +44,7 @@ class Flow1(FlowSpec):
 
         chart = alt.Chart(df).mark_point().encode(
             x=alt.X('age', scale=alt.Scale(domain=(30, 50))),
-            y=alt.Y('price')
+            y=alt.Y('price'),
         )
 
         chart_reg = (

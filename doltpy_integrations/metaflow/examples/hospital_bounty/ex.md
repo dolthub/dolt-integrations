@@ -5,7 +5,7 @@
 We heard a rumor that Florida gives cheap hip transplants
 due to its wealth of senior residents. We will
 use the Hospital Price Transparency bounty data to test that hypothesis,
-and search for a relationship between procudure price and a state's median age.
+and search for a relationship between procedure price and a state's median age.
 
 To do so requires two datasets:
 - age
@@ -44,7 +44,6 @@ Comment on correlation. What's with the outlier? We'll get to that in part 2.
             prices = dolt.sql(get_prices_per_state, as_key="prices")
 ```
 
-
 What did we learn here: Metaflow basics, flow issues query -- get data, plot data.
 
 ## Flow 2: Code change, db reference
@@ -53,7 +52,7 @@ MN looks weird, lets drop data point in code and re-run.
 
 Show graph. (code 2 + master 1 plot)
 <p align="center">
-  <img src="flow2.png" width="450">
+  <img src="Flow2.png" width="450">
 </p>
 
 (code 2 comments)
@@ -98,7 +97,7 @@ diff --dolt a/prices b/prices
 +-----+-------+------------+-------------------------+-------------+
 ```
 
-New branch from a flow that drops excessive outliers.
+TODO: how to identify the source commit for that row?
 
 What did we learn here -- Dolt keeps track of data lineage, academic attribution, diffs
 help understand how a contribution changes dataset.

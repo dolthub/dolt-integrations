@@ -163,10 +163,8 @@ class DoltDTBase(object):
     def __exit__(self, *args, allow_empty: bool = True):
         if self._new_actions:
             self._reverse_object_action_marks()
-            if not isinstance(self, DoltAuditDT):
-                self._commit_actions()
+            self._commit_actions()
             self._update_dolt_artifact()
-
         return
 
     @runtime_only
@@ -261,6 +259,7 @@ class DoltDTBase(object):
         starting_commit = self._get_latest_commit_hash(db)
         lowercase_dbname = os.path.join(config.database).replace("-", "_")
         try:
+            print(config.database, action.commit)
             db.sql(query=f"set `@@{lowercase_dbname}_head` = '{action.commit}'")
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
@@ -269,6 +268,7 @@ class DoltDTBase(object):
         except Exception as e:
             raise e
         finally:
+            print(config.database, starting_commit)
             db.sql(query=f"set `@@{lowercase_dbname}_head` = '{starting_commit}'")
 
 
@@ -386,6 +386,17 @@ class DoltAuditDT(DoltDTBase):
         config = self._sconfigs[action.config_id]
         return self._execute_read_action(action, config)
 
+    def __exit__(self, *args, allow_empty: bool = True):
+        if self._new_actions:
+            self._reverse_object_action_marks()
+            self._update_dolt_artifact()
+        return
+
+    def _update_dolt_artifact(self):
+        for k, v in self._new_actions.items():
+            self._dolt["actions"][k] = v.dict()
+            self._dolt["configs"][v.config_id] = self._sconfigs[v.config_id].dict()
+        return
 
 def DoltDT(
     run: Optional[FlowSpec] = None,

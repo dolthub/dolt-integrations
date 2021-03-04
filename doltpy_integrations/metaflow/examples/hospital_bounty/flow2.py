@@ -24,15 +24,15 @@ class Flow2(FlowSpec):
 
         with DoltDT(run=self, audit=audit) as dolt:
             prices = dolt.read("prices")
-            prices = prices[prices.price < 90000000]
 
         age.age = age.age.astype(float)
         prices.price = prices.price.astype(float)
+        prices = prices[prices.price < 90000000]
         df = age.set_index("state").join(prices.set_index("state")).dropna()
 
         chart = alt.Chart(df).mark_point().encode(
             x=alt.X('age', scale=alt.Scale(domain=(30, 50))),
-            y=alt.Y('price',scale=alt.Scale(domain=(0, 80000)))
+            y=alt.Y('price'),
         )
 
         chart_reg = (
