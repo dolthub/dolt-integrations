@@ -256,15 +256,9 @@ class DoltDTBase(object):
 
     def _execute_read_action(self, action: DoltAction, config: DoltConfig):
         db = self._get_db(config)
-        #print(config)
-        starting_commit = self._get_latest_commit_hash(db, config)
-        lowercase_dbname = os.path.join(config.database).replace("-", "_")
-        head = f"@@{lowercase_dbname}_head"
-        #starting_commit = db.sql(query=f"SELECT `{head}`", result_format="csv")
-        print(starting_commit)
+        starting_commit = self._get_latest_commit_hash(db)
         try:
-            print(config.database, action.commit)
-            db.sql(query=f"set `{head}` = '{action.commit}'")
+            db.sql(query=f"set `@@{db.repo_name}_head` = '{action.commit}'")
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
             self._mark_object(table, action)
@@ -272,8 +266,7 @@ class DoltDTBase(object):
         except Exception as e:
             raise e
         finally:
-            print(config.database, starting_commit)
-            db.sql(query=f"set `{head}` = '{starting_commit}'")
+            db.sql(query=f"set `@@{db.repo_name}_head` = '{starting_commit}'")
 
 
     @runtime_only
@@ -301,7 +294,6 @@ class DoltDTBase(object):
     @runtime_only
     @audit_unsafe
     def _commit_actions(self, allow_empty: bool = True):
-        print("pending writes", self._pending_writes)
         if not self._pending_writes:
             return
 
@@ -310,7 +302,7 @@ class DoltDTBase(object):
             db.add(a.table_name)
 
         db.commit(f"Run: {self._pathspec}", allow_empty=allow_empty)
-        commit = self._get_latest_commit_hash(db, self._config)
+        commit = self._get_latest_commit_hash(db)
         for a in self._pending_writes:
             self._new_actions[a.key].commit = commit
 
@@ -345,19 +337,14 @@ class DoltDTBase(object):
             )
 
         if not config.commit:
-            config.commit = self._get_latest_commit_hash(doltdb, config)
+            config.commit = self._get_latest_commit_hash(doltdb)
 
         self._dbcache[config.id] = doltdb
         return doltdb
 
     @staticmethod
-    def _get_latest_commit_hash(dolt: Dolt, config: DoltConfig) -> str:
-        lowercase_dbname = os.path.join(config.database).replace("-", "_")
-        head = f"@@{lowercase_dbname}_head"
-        starting_commit = dolt.sql(query=f"SELECT `{head}`", result_format="csv")[0][head]
-        return starting_commit
-        #lg = dolt.log(number=1)
-        #return lg.popitem(last=False)[0]
+    def _get_latest_commit_hash(dolt: Dolt) -> str:
+        return dolt.head
 
     @property
     def _pathspec(self):
