@@ -177,7 +177,6 @@ class DoltDTBase(object):
             if key and key in self._new_actions:
                 self._new_actions[key].artifact_name = a
 
-
     def read(self, table_name: str, as_key: Optional[str] = None):
         action = DoltAction(
             kind="read",
