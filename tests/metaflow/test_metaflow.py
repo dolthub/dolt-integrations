@@ -35,6 +35,15 @@ def test_branchdt_cm_read(active_run, dolt_config):
     assert audit["actions"]["bar"]["kind"] == "read"
     assert audit["actions"]["bar"]["query"] == "SELECT * FROM `bar`"
 
+def test_auditdt_cm_read(active_run, dolt_audit1):
+    with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
+        df = dolt.read("bar")
+    np.testing.assert_array_equal(df.A.values, ["2","2","2"])
+    audit = active_run.dolt
+    assert "bar" in audit["actions"]
+    assert audit["actions"]["bar"]["kind"] == "read"
+    assert audit["actions"]["bar"]["query"] == "SELECT * FROM `bar`"
+
 def test_branchdt_standalone_init(inactive_run, dolt_config):
     dolt = DoltDT(config=dolt_config)
 

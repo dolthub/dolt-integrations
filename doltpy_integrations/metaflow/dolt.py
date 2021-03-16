@@ -165,7 +165,6 @@ class DoltDTBase(object):
             self._reverse_object_action_marks()
             self._commit_actions()
             self._update_dolt_artifact()
-
         return
 
     @runtime_only
@@ -259,7 +258,7 @@ class DoltDTBase(object):
         db = self._get_db(config)
         starting_commit = self._get_latest_commit_hash(db)
         try:
-            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{action.commit}'")
+            db.sql(query=f"set `@@{db.repo_name}_head` = '{action.commit}'")
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
             self._mark_object(table, action)
@@ -267,7 +266,7 @@ class DoltDTBase(object):
         except Exception as e:
             raise e
         finally:
-            db.sql(query=f"set @@{os.path.basename(config.database)}_head = '{starting_commit}'")
+            db.sql(query=f"set `@@{db.repo_name}_head` = '{starting_commit}'")
 
 
     @runtime_only
@@ -345,8 +344,7 @@ class DoltDTBase(object):
 
     @staticmethod
     def _get_latest_commit_hash(dolt: Dolt) -> str:
-        lg = dolt.log()
-        return lg.popitem(last=False)[0]
+        return dolt.head
 
     @property
     def _pathspec(self):
@@ -384,6 +382,17 @@ class DoltAuditDT(DoltDTBase):
         config = self._sconfigs[action.config_id]
         return self._execute_read_action(action, config)
 
+    def __exit__(self, *args, allow_empty: bool = True):
+        if self._new_actions:
+            self._reverse_object_action_marks()
+            self._update_dolt_artifact()
+        return
+
+    def _update_dolt_artifact(self):
+        for k, v in self._new_actions.items():
+            self._dolt["actions"][k] = v.dict()
+            self._dolt["configs"][v.config_id] = self._sconfigs[v.config_id].dict()
+        return
 
 def DoltDT(
     run: Optional[FlowSpec] = None,
