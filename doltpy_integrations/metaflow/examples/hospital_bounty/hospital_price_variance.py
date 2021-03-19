@@ -1,5 +1,4 @@
 import logging
-import json
 
 from metaflow import FlowSpec, Run, step, Parameter
 from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
@@ -71,7 +70,6 @@ class HospitalPriceVariance(FlowSpec):
 
     @step
     def end(self):
-        print(json.dumps(self.dolt, indent=4))
         pass
 
 

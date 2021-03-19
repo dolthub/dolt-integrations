@@ -3,23 +3,26 @@ title: Introducing Dolt + Metaflow
 ---
 
 ## Background
-This post details how to use Metaflow with Dolt to create data pipelines that provide full reproducibility and lineage tracking capabilities. It is also not an end-to-end solution, meaning users can combine this with their existing data stores to solve problems without undertaking large scale infrastructure projects.
+This post details how to use Metaflow with Dolt. [Metaflow](https://metaflow.org/) is a workflow manager that offers data scientists the ability to define small experiments and production jobs from a single API. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features for capturing state. Each commit corresponds to a complete state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
 
-[Metaflow](https://metaflow.org/) allows users to define data science workflows natively in Python, called “Flows." Each run of a Flow is called a “Run”. Runs are stored in a metadata store, and can be retrieved after the fact. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features for capturing state. Each commit corresponds to a complete state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
+The `doltpy-integrations` Python package provides hooks that make it easy to use Dolt from Metaflow. Metaflow stores metadata about flow execution, referred to as a "run." Each time a flow that interacts with Dolt via the integration Metaflow captures a small amount of metadata that makes that interaction completely reproducible. Since Dolt database root hashes are unique, this creates a mapping between Metaflow runs and Dolt commits that can be exploited to provide users with powerful lineage and reproducibility features. 
+
+At the level of the Flow, the integration looks like this:
+
+![Flow level view](dolt-metaflow-integration-flow-level.png)
 
 
-The Metaflow + Dolt in integration is provided by a separate Python package, `doltpy-integrations` installed with `metaflow` option. The integration works by Metaflow storing metadata about Dolt reads and writes. This means that after the fact runs can reproduce inputs and outputs without duplicating data. Metaflow just uses Dolt SQL to retrieve the specified data using recorded Metadata. At the individual flow level that looks something like this:
+Drilling into one of the runs:
 
-![Integration Schematic](dolt-metaflow-tracking-mechanism.png)
+![Run level view](dolt-metaflow-integration-run-level.png)
 
-At flow definition level, each flow having multiple runs, that looks something like this:
-
-![Integration Schematic](dolt-metaflow-integration-multiple-flows.png)
-
-This is all abstract, so let's install a few dependencies, grab a dataset, and get stuck into a concrete example using an open dataset from DoltHub.
+This is all abstract, so let's install a few dependencies, grab a dataset, and get stuck some armchair data science.
 
 ## Setup
-First, we want to get set up with a sample dataset and Flow to illustrate these new capabilities. DoltHub recently ran a “data bounty” to create a high quality SQL database of hospital pricing data. You can read more about how DoltHub obtained the data here.
+Let's get the boring stuff out of the way. We need the following:
+- Dolt and `doltpy-integrations` installed
+- Metaflow installed
+- the sample dataset we will use, which can easily clone from DoltHub
 
 ### Install Dolt
 The first step is to install Dolt on a `*nix` system:
@@ -48,14 +51,27 @@ $ dolt sql
 ...
 ```
 
+## Arm Chair Data Science
+We are going to demonstrate a sample flow defined in Metaflow that is designed to a hypothesis about our sample dataset. The data set we acquired is the result of a "data bounty." A data bounty is crowd sourced data gathering project sponsored by DoltHub. You can read more about this particular bounty in this blog [post](https://www.dolthub.com/blog/2021-03-03-hpt-bounty-review/).
+
+The hyposthesis we wish to test is this:
+> As the observation count increases, the procedure level price variance should decrease
+
+Let's jump into defining a Metaflow pipeline that will answer this question.
+
 ## Using Metaflow
-We are going to show how to use Metaflow with Dolt by setting up a Flow to compute some aggregates on the hospital pricing dataset we acquired. In particular we would like to know how much median prices vary across states by procedure. Our Flow will perform have three steps
+In this case we are using Dolt as the input, as well as for storing intermediate results and outputs. In many use-cases the upstream datasource might come from a data warehouse of some kind. The architecture for our flow looks something like:
+
+
+Our flow has three steps:
 - `start`: compute and store state level medians for every procedure
 - `variances`: compute procedure level variances across states
-- `stop`: required by Metaflow
+- `end`: required by Metaflow
 
-In this case `start` reads and computes an intermediate result. This result is stored to Dolt. `variances` uses this intermediate result to compute the data we want. The state level medians are not especially taxing to compute, but in a real world setting it's perfectly plausible that an intermediate result is used by many downstream jobs and cannot ergonomically be recomputed on the fly. Versioning provides read isolation to users of that intermediate result.
+In this case `start` reads and computes an intermediate result. This result is stored to Dolt. `variances` uses this intermediate result to compute the data of interest. The state level medians are not especially taxing to compute, but in a real world setting it's perfectly plausible that an intermediate result is used by many downstream jobs and cannot ergonomically be recomputed on the fly. Versioning provides read isolation to users of that intermediate result. This what the flow looks like schematically:
+![Flow definition schematic](dolt-metaflow-integration-sample-job-schematic.png)
 
+The Flow can be run as follows:
 ```
 > poetry run python3 hospital_price_variance.py run \ 
 --hospital-price-db path/to/hospital-price-transparency
@@ -96,6 +112,10 @@ In this case `start` reads and computes an intermediate result. This result is s
             median_price_by_state = dolt.read("state_procedure_medians")
             variance_by_procedure = median_price_by_state.groupby("code").var()
             dolt.write(variance_by_procedure, "variance_by_procedure")
+
+    @step
+    def end(self):
+        pass
 ```
 
 Let's access that result via the Meatflow API to make clear the mechanism of the integration:
@@ -104,9 +124,10 @@ from metaflow import Flow
 from doltpy_integrations.metaflow import 
 dolt = DoltDT(run=self, audit=Flow("HospitalPriceVariance").latest_successful_run)
 df = dolt.read("variance_by_procedure")
+# TODO show the dataset here
 ```
 
-The `DoltDT` class knows how to use a Metaflow `Run` instance to resolve to a commit, and return the exact tables that were read or written.
+The `DoltDT` class knows how to use a Metaflow `Run` instance to resolve to a commit, and return the exact tables that were read or written. Let's move on to examine what this actually enables Metaflow users to do in practice.
 
 ### Lineage
 Now suppose that we use the same method to access the medians we used to compute procedure variances across states:
@@ -118,7 +139,7 @@ dolt = DoltDT(run=self, audit=Flow("HospitalPriceVariance").latest_successful_ru
 df = dolt.read("state_procedure_medians")
 ```
 
-We just pulled in the intermediate dataset that was used to compute the variances directly from the Metaflow client. 
+We just pulled in the intermediate dataset that was used to compute the variances directly from the Metaflow client. Now
 
 ### Reproducibility
 Suppose now that we make a series of changes to our Metaflow job to correct for how we are computing the variances. The upstream dataset has been changing, but we want to verify that our code changes produce the desired results by fixing the input data:
@@ -146,6 +167,4 @@ Our input dataset is coming from Dolt, the hospital price transparency dataset. 
 ```
 
 ## Conclusion
-In this post we saw how to use Dolt from Metaflow. Dolt is a version controlled SQL database, and Metaflow is a framework or defining data engineering and data science jobs. The Metaflow + Dolt integraion allows to use Dolt directly from the Metaflow API without having to learn new concepts. At the same time users that know Dolt, or SQL and Git, can use Dolt directly to manage and interpret the results of their Metaflow jobs that are written to their Dolt databases.
-
-We hope to enable both Dolt and Metaflow users to augment their existing data infrastructure with new capabilities that work with their existing toolchain.
+In this post we saw how to use Dolt from Metaflow. Dolt is a version controlled SQL database, and Metaflow is a framework or defining data engineering and data science jobs. The Metaflow + Dolt integration allows Metaflow users to use Dolt directly from the Metaflow API without having to learn new concepts. At the same time users that know Dolt, or SQL and Git, can use Dolt directly to manage and interpret the results of their Metaflow jobs that are written to their Dolt databases.
