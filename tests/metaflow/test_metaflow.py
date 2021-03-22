@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from doltpy_integrations.metaflow import DoltDT, DoltConfig
+from doltpy_integrations.metaflow import DoltDT, DoltConfig, detach_head
 
 def test_branchdt_cm_init(active_run, dolt_config):
     with DoltDT(run=active_run, config=dolt_config) as dolt:
@@ -134,3 +134,16 @@ def test_auditdt_cm_diff(active_run, dolt_audit1, doltdb):
     with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
         df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
         diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
+
+def test_detach_head(doltdb):
+    db = Dolt(doltdb)
+    commits = list(db.log().keys())
+
+    with detach_head(db, commits[1]):
+        sum1 = db.sql("select sum(A) as sum from bar", result_format="csv")[0]
+
+    with detach_head(db, commits[0]):
+        sum2 = db.sql("select sum(A) as sum from bar", result_format="csv")[0]
+
+    assert sum1["sum"] == "3"
+    assert sum2["sum"] == "6"
