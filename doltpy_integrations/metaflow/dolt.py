@@ -10,10 +10,9 @@ import uuid
 
 import pandas as pd
 
-from doltpy.cli import Dolt
-from doltpy.cli.write import write_pandas
-from doltpy.cli.dolt import DoltException
+from doltcli import Dolt, DoltException
 from doltpy.cli.read import read_pandas_sql
+from doltpy.cli.write import write_pandas
 from metaflow import FlowSpec, Run, current
 
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"

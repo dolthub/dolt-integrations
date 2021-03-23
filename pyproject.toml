@@ -7,7 +7,7 @@ authors = ["Max Hoffman <max@dolthub.com>"]
 [tool.poetry.dependencies]
 python = "^3.7"
 metaflow = "^2.2.6"
-doltpy = "^2.0.3"
+doltpy = "^2.0.5"
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"
