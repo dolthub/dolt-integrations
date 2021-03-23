@@ -257,7 +257,7 @@ class DoltDTBase(object):
         db = self._get_db(config)
         starting_commit = self._get_latest_commit_hash(db)
         try:
-            db.sql(query=f"set `@@{db.repo_name}_head` = '{action.commit}'")
+            db.sql(query=f"set `@@{db.repo_name}_head` = '{action.commit}'", result_format='csv')
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
             self._mark_object(table, action)

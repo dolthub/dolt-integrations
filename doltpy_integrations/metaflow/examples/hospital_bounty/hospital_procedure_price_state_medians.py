@@ -1,5 +1,6 @@
 import logging
 
+import pandas as pd
 from metaflow import FlowSpec, Run, step, Parameter
 from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
 
@@ -7,7 +8,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
 
-class HospitalPriceVariance(FlowSpec):
+class HospitalPriceStateMedians(FlowSpec):
 
     hospital_price_db = Parameter(
         "hospital-price-db", help="Database of hospital procedure prices", required=True
@@ -31,27 +32,24 @@ class HospitalPriceVariance(FlowSpec):
 
     @step
     def start(self):
-
-        if not self.run_path:
-            read_conf = DoltConfig(database=self.hospital_price_db, branch=self.hospital_branch)
+        if not self.historical_run_path:
+            read_conf = DoltConfig(
+                database=self.hospital_price_db,
+                branch=self.hospital_price_db_branch
+            )
         else:
             read_conf = DoltConfig(run=self, audit=Run(self.historical_run_path).data.dolt)
 
         with DoltDT(run=self, config=read_conf) as dolt:
-            prices_by_state = """
-                SELECT
-                  h.state,
-                  p.code,
-                  p.payer,
-                  p.price
-                FROM
-                  prices p
-                  LEFT JOIN hospitals h ON p.npi_number = h.npi_number;
-            """
-            prices = dolt.sql(prices_by_state, as_key="prices")
+            prices_sql = "SELECT npi_number, code, payer, price FROM prices"
+            prices = dolt.sql(prices_sql)
+            hospitals_sql = "SELECT state, npi_number FROM hospitals"
+            hospitals = dolt.sql(hospitals_sql)
 
-        median_price_by_state = prices.groupby(['state', 'code']).median()
+        prices_by_state = prices.join(hospitals, how='left', on='npi_number')
+        median_price_by_state = prices_by_state.groupby(['state', 'code']).median()
 
+        print("writing medians to Dolt")
         write_conf = DoltConfig(database=self.hospital_price_analysis_db)
         with DoltDT(run=self, config=write_conf) as dolt:
             dolt.write(
@@ -60,13 +58,8 @@ class HospitalPriceVariance(FlowSpec):
                 ["state", "code"]
             )
 
-    @step
-    def variances(self):
-        analysis_conf = DoltConfig(database=self.hospital_price_analysis_db, branch=self.hospital_branch)
-        with DoltDT(run=self, config=analysis_conf) as dolt:
-            median_price_by_state = dolt.read("state_procedure_medians")
-            variance_by_procedure = median_price_by_state.groupby("code").var()
-            dolt.write(variance_by_procedure, "variance_by_procedure")
+        self.next(self.end)
+
 
     @step
     def end(self):
@@ -74,4 +67,4 @@ class HospitalPriceVariance(FlowSpec):
 
 
 if __name__ == "__main__":
-    HospitalPriceVariance()
+    HospitalPriceStateMedians()
