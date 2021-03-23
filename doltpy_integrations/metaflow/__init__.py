@@ -1,1 +1,1 @@
-from .dolt import DoltDT, DoltConfig
+from .dolt import DoltDT, DoltConfig, detach_head
