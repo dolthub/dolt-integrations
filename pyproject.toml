@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "doltpy_integrations"
+name = "dolt_integrations"
 version = "0.1.0"
 description = ""
 authors = ["Max Hoffman <max@dolthub.com>"]
@@ -7,7 +7,8 @@ authors = ["Max Hoffman <max@dolthub.com>"]
 [tool.poetry.dependencies]
 python = "^3.7"
 metaflow = "^2.2.6"
-doltpy = "^2.0.3"
+doltcli = "^0.1.4"
+pandas = ">=1.0.5"
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"
