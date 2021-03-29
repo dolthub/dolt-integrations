@@ -371,7 +371,7 @@ class DoltAuditDT(DoltDTBase):
         action.key = as_key or key
         if action.kind != "read":
             action.kind = "read"
-            action.query = action.query or f"SELECT * FROM `{action.table_name}`",
+            action.query = action.query or f"SELECT * FROM `{action.table_name}`"
 
         config = self._sconfigs[action.config_id]
         return self._execute_read_action(action, config)
