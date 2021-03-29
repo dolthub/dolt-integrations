@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 from metaflow import FlowSpec, Run, step, Parameter
-from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
+from dolt_integrations.metaflow.dolt import DoltConfig, DoltDT
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)

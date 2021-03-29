@@ -1,19 +1,15 @@
-from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from functools import wraps
 import hashlib
 import json
-import os
 import time
 from typing import Dict, List, Optional, Union
 import uuid
-
+from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
 from doltcli import Dolt, DoltException
-from doltpy.cli.read import read_pandas_sql
-from doltpy.cli.write import write_pandas
-from metaflow import FlowSpec, Run, current
+from metaflow import FlowSpec
 
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"
 
@@ -30,7 +26,7 @@ class DoltAction:
 
     pathspec: str
     table_name: str = None
-    commit: str = None
+    commit: str = Optional[None]
     kind: str = "read"
     query: str = None
     artifact_name: str = None
@@ -218,7 +214,7 @@ class DoltDTBase(object):
 
         action = DoltAction(
             kind="write",
-            key=table_name or key,
+            key=as_key or table_name,
             commit=None,
             config_id=self._config.id,
             query=f"SELECT * FROM `{table_name}`",

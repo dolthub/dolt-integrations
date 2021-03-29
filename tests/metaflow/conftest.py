@@ -1,13 +1,13 @@
 import os
 import shutil
 
-from doltpy.cli import Dolt
-from doltpy.cli.write import write_pandas
+from doltcli import Dolt
+from dolt_integrations.utils import write_pandas
 import metaflow
 import pandas as pd
 import pytest
 
-from doltpy_integrations.metaflow import DoltDT, DoltConfig
+from dolt_integrations.metaflow import DoltDT, DoltConfig
 
 @pytest.fixture(scope="function")
 def dolt_audit1(doltdb):
