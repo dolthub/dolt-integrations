@@ -64,6 +64,22 @@ def test_auditdt_standalone_init(active_run, dolt_audit1):
 def test_auditdt_standalone_read(active_run, dolt_audit1):
     dolt = DoltDT(audit=dolt_audit1)
     df = dolt.read("bar")
+    np.testing.assert_array_equal(df.A.values, [2, 2, 2])
+    assert dolt._dolt["actions"] == {}
+
+
+def test_auditdt_inactive_standalone_read(inactive_run, dolt_audit1):
+    dolt = DoltDT(audit=dolt_audit1)
+    df = dolt.read("bar")
+    np.testing.assert_array_equal(df.A.values, [2, 2, 2])
+    assert dolt._dolt["actions"] == {}
+
+
+def test_auditdt_inactive_kwarg_standalone_read(inactive_run, dolt_audit1):
+    dolt = DoltDT(run=inactive_run, audit=dolt_audit1)
+    df = dolt.read("bar")
+    np.testing.assert_array_equal(df.A.values, [2, 2, 2])
+    assert dolt._dolt["actions"] == {}
 
 
 # branch write success
