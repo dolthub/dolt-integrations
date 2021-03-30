@@ -116,6 +116,7 @@ def runtime_only(error: bool = True):
                 logger.warning(msg)
 
         return inner
+
     return outer
 
 
@@ -130,7 +131,6 @@ def audit_unsafe(f):
 
 
 class DoltDTBase(object):
-
     def __init__(self, run: Optional[FlowSpec], config: Optional[DoltConfig] = None):
         """
         Can read or write with Dolt, starting from a single reference commit.
@@ -238,10 +238,7 @@ class DoltDTBase(object):
 
     @audit_unsafe
     def diff(
-        self,
-        from_commit: str,
-        to_commit: str,
-        table: Union[str, List[str]]
+        self, from_commit: str, to_commit: str, table: Union[str, List[str]]
     ) -> Dict[str, pd.DataFrame]:
         def get_query(table: str) -> str:
             return f"""
@@ -263,7 +260,10 @@ class DoltDTBase(object):
         db = self._get_db(config)
         starting_commit = self._get_latest_commit_hash(db)
         try:
-            db.sql(query=f"set `@@{db.repo_name}_head` = '{action.commit}'", result_format='csv')
+            db.sql(
+                query=f"set `@@{db.repo_name}_head` = '{action.commit}'",
+                result_format="csv",
+            )
             table = read_pandas_sql(db, action.query)
             self._add_action(action)
             self._mark_object(table, action)
@@ -272,7 +272,6 @@ class DoltDTBase(object):
             raise e
         finally:
             db.sql(query=f"set `@@{db.repo_name}_head` = '{starting_commit}'")
-
 
     @runtime_only(error=False)
     def _add_action(self, action: DoltAction):
@@ -287,7 +286,9 @@ class DoltDTBase(object):
 
     def _hash_object(self, obj):
         if isinstance(obj, pd.DataFrame):
-            h = hashlib.sha256(pd.util.hash_pandas_object(obj, index=True).values).hexdigest()
+            h = hashlib.sha256(
+                pd.util.hash_pandas_object(obj, index=True).values
+            ).hexdigest()
         else:
             h = hash(obj)
         return h
@@ -357,11 +358,12 @@ class DoltDTBase(object):
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
-class DoltBranchDT(DoltDTBase):
 
+class DoltBranchDT(DoltDTBase):
     def __init__(self, run: FlowSpec, config: DoltConfig):
         super().__init__(run=run, config=config)
         self._get_db(self._config)
+
 
 class DoltAuditDT(DoltDTBase):
     def __init__(self, audit: dict, run: Optional[FlowSpec] = None):
@@ -398,6 +400,7 @@ class DoltAuditDT(DoltDTBase):
             self._dolt["actions"][k] = v.dict()
             self._dolt["configs"][v.config_id] = self._sconfigs[v.config_id].dict()
         return
+
 
 def DoltDT(
     run: Optional[FlowSpec] = None,

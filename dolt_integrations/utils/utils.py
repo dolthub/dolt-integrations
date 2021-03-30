@@ -5,8 +5,9 @@ from doltcli import Dolt
 from doltcli.utils import (  # type: ignore
     _import_helper,
     get_read_table_asof_query,
-    read_table_sql
+    read_table_sql,
 )
+
 
 def parse_to_pandas(sql_output: str) -> pd.DataFrame:
     return pd.read_csv(sql_output)
