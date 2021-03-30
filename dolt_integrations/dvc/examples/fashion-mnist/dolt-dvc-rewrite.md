@@ -12,20 +12,21 @@ More importantly, what is the right way to compare two reproducibility tools?
 # Background
 
 The ML tooling space is changing quickly, budding hundreds of
-projects with competing and overlapping narratives of how the future will
-look. Some projects, like Blue River, expand
-the capabilities of specific verticals, like autonomous tractors. Other
-tools, like Weights and Biases, support specific stages in the ML
+competing and overlapping narratives of how the future will
+look in data-land. Some projects, like Blue River, expand
+the capabilities of specific verticals, like autonomous tractors. Others
+like Weights and Biases support specific stages in the ML
 lifecycle, like training and result tracking.
-Other projects like Tecton and Databricks are harder to traditionally
-classify as they aim to redefine what MLOps-as-a-platform means at
-Enterprise-scale.
+Other projects like Tecton and Databricks aim to redefine what
+MLOps-as-a-platform means at Enterprise-scale, making them much harder
+to bucket and define.
 
 "Data versioning and reproducibility" has a decievingly simple scope
 that masks the variety and difficulty of data capture, similar to
-platform projects. We often get asked how to comapre two reproducibility
+platform projects. At Dolt, we often get asked how to comapre two reproducibility
 projects that claim similar goals. Today, we will take a slice of that
-puzzle and put it under the microscope.
+puzzle and put it under the microscope in the context of an ML
+workflow.
 
 We built an integration between DVC and Dolt to help compare the
 two along several dimensions:
@@ -50,16 +51,17 @@ The reason we chose this example, to give a TLDR of the blog, is that:
 1. DVC documents workflows by recording commands and metadata of files
    that can be synced between local workspaces and remote file-systems.
 2. Dolt is a versioned SQL database with novel features for managing
-   strictly typed tabular data.
+   strictly-typed tabular data.
 
 In the instances where data is a mix of CSV/Parquet tables and blobs
 (like images), using Dolt and DVC together is interesting because Dolt
 does not store arbitrary files well, and DVC likewise does not provide
-unique support for tabular data.
+unique support for tabular data. Together they support each-others blind
+spots.
 
 ## Setup
 
-Clone and install DVC's dolt-integration branch:
+Clone and install DVC's `dolt-integration` branch:
 ```bash
 > git clone git@github.com:iterative/dvc.git
 > cd dvc
