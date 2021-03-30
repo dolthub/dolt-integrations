@@ -2,9 +2,14 @@ from dataclasses import dataclass, field, replace
 from functools import wraps
 import hashlib
 import json
+import logging
 import time
 from typing import Dict, List, Optional, Union
 import uuid
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
@@ -95,17 +100,23 @@ class DoltAudit(object):
         return cls(**json.loads(data))
 
 
-def runtime_only(f):
-    @wraps(f)
-    def inner(*args, **kwargs):
-        from metaflow import current
+def runtime_only(error: bool = True):
+    def outer(f):
+        @wraps(f)
+        def inner(*args, **kwargs):
+            from metaflow import current
 
-        if not current.is_running_flow:
-            raise ValueError(f"Action only permitted during running flow: {repr(f)}")
+            if current.is_running_flow:
+                return f(*args, **kwargs)
 
-        return f(*args, **kwargs)
+            msg = f"Action only permitted during running flow: {repr(f)}"
+            if error:
+                raise ValueError(msg)
+            else:
+                logger.warning(msg)
 
-    return inner
+        return inner
+    return outer
 
 
 def audit_unsafe(f):
@@ -162,7 +173,7 @@ class DoltDTBase(object):
             self._update_dolt_artifact()
         return
 
-    @runtime_only
+    @runtime_only()
     def _reverse_object_action_marks(self):
         new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
         for a in new_attributes:
@@ -197,7 +208,7 @@ class DoltDTBase(object):
         )
         return self._execute_read_action(action, self._config)
 
-    @runtime_only
+    @runtime_only()
     @audit_unsafe
     def write(
         self,
@@ -263,7 +274,7 @@ class DoltDTBase(object):
             db.sql(query=f"set `@@{db.repo_name}_head` = '{starting_commit}'")
 
 
-    @runtime_only
+    @runtime_only(error=False)
     def _add_action(self, action: DoltAction):
         if action.key in self._new_actions:
             raise ValueError("Duplicate key attempted to override dolt state")
@@ -281,11 +292,11 @@ class DoltDTBase(object):
             h = hash(obj)
         return h
 
-    @runtime_only
+    @runtime_only(error=False)
     def _mark_object(self, obj, action: DoltAction):
         self._dolt_marked[self._hash_object(obj)] = action.key
 
-    @runtime_only
+    @runtime_only()
     @audit_unsafe
     def _commit_actions(self, allow_empty: bool = True):
         if not self._pending_writes:
