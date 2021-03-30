@@ -26,7 +26,7 @@ Setup a scratch folder for un-tracked data:
 > echo "data/" >> .gitignore
 ```
 
-Finally, let's download some source-code adapted from the [offical Tensorflow
+Finally, let's download training source-code adapted from the [offical Tensorflow
 # TODO: make this
 documentation](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/keras/classification.ipynb).
 ```bash
