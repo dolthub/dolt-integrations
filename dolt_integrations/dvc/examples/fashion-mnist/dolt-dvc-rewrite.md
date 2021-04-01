@@ -91,7 +91,10 @@ documentation](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/
 Downloading data with DVC is similar to using cURL to download a file:
 ```bash
 > dvc get git@github.com:zalandoresearch/fashion-mnist.git data/fashion --out data/
-> dvc get git@github.com:zalandoresearch/fashion-mnist.git data/mnist --out data/
+> dvc get-url http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz scratch/mnist/
+> dvc get-url http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz scratch/mnist/
+> dvc get-url http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz scratch/mnist/
+> dvc get-url http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz scratch/mnist/
 ```
 
 "Adding" a file to DVC records metadata and replaces that filename with a
@@ -102,25 +105,41 @@ symlink to a DVC cache elsewhere on our system:
 
 Pulling files from existing DVC repos combines the steps, automatically
 symlinking the file from our cache.
-TODO
 
 ### Dolt
 
-Cloning data from Dolt is simple after the database has been created:
-```bash
-> dolt clone max/mnist
-```
-
 Creating a database requires a transform if the
 data is not already a CSV or similar file, like MNIST:
-```
-TODO
+```python
+In [1]: import os
+   ...: import gzip
+   ...: import numpy as np
+   ...: import doltcli as dolt
+
+In [2]: with gzip.open("scratch/mnist/train-labels-idx1-ubyte.gz","r") as f:
+   ...:     f.read(8) # first two bytes are padded zeros
+   ...:     buf = f.read()
+   ...:     labels = np.frombuffer(buf, dtype=np.uint8).astype(np.int64)
+
+In [2]: os.makedirs("mnist", exist_ok=True)
+   ...: dolt.Dolt.init("mnist")
+   ...: db = dolt.Dolt("mnist")
+   ...: n = len(labels)
+   ...: dolt.write_columns(db, "labels", dict(row_id=range(n), train=[True]*n, label=labels), primary_key=["row_id"])
+   ...: db.sql("select DOLT_COMMIT('-am', 'Add MNIST labels')")
 ```
 
-DVC adding a dolt database creates a `.dvc` metadata file, but
+I already did this for MNIST and Fashion MNIST, which can be [viewed on
+DoltHub](https://www.dolthub.com/repositories/max-hoffman/mnist) and cloned
+locally with:
+```bash
+> dolt clone max-hoffman/mnist data/mnist
+```
+
+DVC "adding" a dolt database creates a `.dvc` metadata file, but
 bypasses the cache because Dolt has its own storage format:
 ```bash
-dvc add max/mnist
+dvc add data/mnist
 ```
 
 Notice that the metadata hash of our Dolt database is not a standard
