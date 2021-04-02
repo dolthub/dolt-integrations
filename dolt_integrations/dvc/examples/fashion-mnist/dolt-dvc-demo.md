@@ -455,7 +455,7 @@ now. Three-heads let us monitor whether the current database has changed
 the most recent DVC-add, and if necessary, checkout
 the appropriate database version.
 
-##sCommits
+## Commits
 
 In DVC, output lineage is captured as Git-committed YAML files.
 Pre-defined output paths are saved as-is when a workflow completes.
