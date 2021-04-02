@@ -482,12 +482,23 @@ You can learn more about how to use Dolt’s Git and SQL features
 DVC’s main metadata is the md5-hash used to sync local and remote
 filesystems. Usually, DVC hashes files and directories the same
 way as Git. To avoid duplicating what Dolt does internally, we
-substituted Dolt’s commits in-lieu of an md5 hash. Dolt
-heads tell us 1) the last commit, 2) the ongoing index/staging commit hash,
-and 3) the commit hash if all files in our working directory were committed
-now. Three-heads let us monitor whether the current database has changed
-the most recent DVC-add, and if necessary, checkout
-the appropriate database version.
+substituted Dolt’s commits in-lieu of an md5 hash.
+
+```bash
+> cat data/labels.dvc
+outs:
+- md5: tkcao72e0upe2umb2kokartgivd9keqc-pinisl8m4tfdecb8iikqhicta61nou9s.dolt
+  size: 1465033
+  path: labels
+  cache: false
+```
+
+Dolt's three  heads tell us 1) the last commit, 2) the hash if
+all files in our working directory were committed now
+, 3) the ongoing index/staging commit hash.
+The first two, HEAD and working, let us monitor whether the
+database has changed since the most recent DVC-add. If necessary,
+the HEAD commit can be used to update to the appropriate database version.
 
 ## Commits
 
