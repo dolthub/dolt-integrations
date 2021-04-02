@@ -52,6 +52,20 @@ We will train an image classifier with model code taken from the
 [Tensorflow
 docs](https://www.tensorflow.org/tutorials/keras/classification).
 
+MNIST is a standard image classification dataset composed of handwritten
+digits.
+
+![MNIST
+sample](https://storage.googleapis.com/tfds-data/visualization/fig/mnist-3.0.1.png)
+w
+Fashion-MNIST is a drop-in replacement for MNIST, but with greyscale
+images of clothing instead of handwritten digits. The designers of
+Fashion-MNIST believe MNIST is too easy, overused, and
+non-representative or modern computer vision tasks.
+
+![Fashion-MNIST
+sample](https://www.tensorflow.org/tutorials/keras/classification_files/output_oZTImqg_CaW1_0.png)
+
 We chose this example to showcase Dolt and DVC’s strengths:
 1. DVC documents workflows by recording commands and the metadata of files
    synced to remote file-systems.
@@ -94,6 +108,13 @@ Dolt to inspect results between training runs:
 | 1.580542  | master       | 2021-04-02 10:43:14.570946 +0000 UTC | 0.6217 |
 +-----------+--------------+--------------------------------------+--------+
 ```
+
+If you are intersted in digging more into the model training, refer to
+the [training
+tutorial](https://www.tensorflow.org/tutorials/keras/classification).
+
+![Prediction
+sample](https://www.tensorflow.org/tutorials/keras/classification_files/output_Ko-uzOufSCSe_0.png)
 
 ## Setup
 
