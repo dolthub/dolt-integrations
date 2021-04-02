@@ -1,3 +1,4 @@
+import datetime
 import gzip
 import os
 
@@ -50,6 +51,15 @@ def train():
     model_path = "data/model"
     prediction_path = "data/predictions"
 
+    # verify clean database states
+    preddb = dolt.Dolt(prediction_path)
+    if not preddb.status().is_clean:
+        raise ValueError("Prediction database state must be clean to start a run.")
+
+    labeldb = dolt.Dolt(label_path)
+    if not preddb.status().is_clean:
+        raise ValueError("Label database state must be clean to start a run.")
+
     (train_images, train_labels), (test_images, test_labels) = get_data(label_path, image_path)
 
     # pre-process images
@@ -69,7 +79,7 @@ def train():
     )
 
     # train model
-    model.fit(train_images, train_labels, epochs=10)
+    model.fit(train_images, train_labels, epochs=1)
     model.save(model_path)
 
     # evaluate model
@@ -83,9 +93,18 @@ def train():
         pred=predictions.tolist(),
         actual=test_labels.tolist(),
     )
-
-    preddb = dolt.Dolt(prediction_path)
     dolt.write_columns(preddb, "predictions", outputs, primary_key=["row_id"])
+
+    ts = datetime.datetime.now()
+    label_branch = labeldb.sql("select active_branch() as ab", result_format="csv")[0]["ab"]
+    summary = dict(
+        loss=test_loss,
+        acc=test_acc,
+        timestamp=ts,
+        label_branch=label_branch,
+    )
+    dolt.write_rows(preddb, "summary", [summary], primary_key=["timestamp"])
+    preddb.sql(f"select dolt_commit('-am', 'New workflow run at {ts}')")
 
 if __name__=="__main__":
     train()
