@@ -46,7 +46,7 @@ def train():
 
     # path parameters
     image_path = "data/images"
-    label_path = "data/mnist"
+    label_path = "data/labels"
     model_path = "data/model"
     prediction_path = "data/predictions"
 
@@ -69,7 +69,7 @@ def train():
     )
 
     # train model
-    model.fit(train_images, train_labels, epochs=1)
+    model.fit(train_images, train_labels, epochs=10)
     model.save(model_path)
 
     # evaluate model
