@@ -55,11 +55,11 @@ docs](https://www.tensorflow.org/tutorials/keras/classification).
 MNIST is a standard image classification dataset composed of handwritten
 digits.
 
-![MNIST
-sample](https://storage.googleapis.com/tfds-data/visualization/fig/mnist-3.0.1.png)
-w
-Fashion-MNIST is a drop-in replacement for MNIST, but with greyscale
-images of clothing instead of handwritten digits. The designers of
+![image](https://user-images.githubusercontent.com/18337807/113457430-95bd0d00-93c4-11eb-860f-3a573b409cbc.png)
+
+
+Fashion-MNIST is a drop-in replacement for MNIST with greyscale
+images of clothing. The designers of
 Fashion-MNIST believe MNIST is too easy, overused, and
 non-representative or modern computer vision tasks.
 
