@@ -7,15 +7,14 @@ import time
 from typing import Dict, List, Optional, Union
 import uuid
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
 from doltcli import Dolt, DoltException
-from metaflow import FlowSpec
+from metaflow import FlowSpec, Run
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"
 
 
@@ -66,6 +65,7 @@ class DoltConfig:
     commit: str = None
     dolthub_remote: bool = False
     push_on_commit: bool = False
+
     # dolt_fqn: str
 
     def dict(self):
@@ -211,11 +211,11 @@ class DoltDTBase(object):
     @runtime_only()
     @audit_unsafe
     def write(
-        self,
-        df: pd.DataFrame,
-        table_name: str,
-        pks: List[str] = None,
-        as_key: str = None,
+            self,
+            df: pd.DataFrame,
+            table_name: str,
+            pks: List[str] = None,
+            as_key: str = None,
     ):
         if not pks:
             df = df.reset_index()
@@ -238,7 +238,7 @@ class DoltDTBase(object):
 
     @audit_unsafe
     def diff(
-        self, from_commit: str, to_commit: str, table: Union[str, List[str]]
+            self, from_commit: str, to_commit: str, table: Union[str, List[str]]
     ) -> Dict[str, pd.DataFrame]:
         def get_query(table: str) -> str:
             return f"""
@@ -403,17 +403,19 @@ class DoltAuditDT(DoltDTBase):
 
 
 def DoltDT(
-    run: Optional[FlowSpec] = None,
-    audit: Optional[dict] = None,
-    config: Optional[DoltConfig] = None,
+        run: Optional[Union[FlowSpec, str]] = None,
+        audit: Optional[dict] = None,
+        config: Optional[DoltConfig] = None,
 ):
     if config and audit:
         raise ValueError("Specify audit or config mode, not both.")
     elif audit:
         return DoltAuditDT(audit=audit, run=run)
+    elif run:
+        run = Run(run) if type(run) == str else run
+        if hasattr(run, "data") and hasattr(run.data, "dolt"):
+            return DoltAuditDT(audit=run.data.dolt, run=run)
     elif config:
         return DoltBranchDT(run, config)
-    elif run and hasattr(run, "data") and hasattr(run.data, "dolt"):
-        return DoltAuditDT(audit=run.data.dolt, run=run)
     else:
         raise ValueError("Specify one of: audit, config")

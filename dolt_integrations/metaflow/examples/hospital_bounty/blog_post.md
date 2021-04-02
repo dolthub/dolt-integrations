@@ -19,7 +19,7 @@ First we will form and test a hypothesis using our pipeline, a bit of Arm Chair 
 We are able to do all of this from the Metaflow API, allowing users to access powerful data version control features from the comfort of their workflow framework.
 
 ## How it Works
-Workflows in Metaflow are called "flows." Each flow stores metadata about flow execution when it is run, referred to as a "run." Each time a run using the integration interacts with Dolt, it captures a small amount of metadata that makes that interaction completely reproducible. Since Dolt database root hashes are unique, this creates a mapping (roughly) between Metaflow runs and Dolt commits that can be exploited to provide users with powerful lineage and reproducibility features. 
+Workflows in Metaflow are called "flows." Each flow stores metadata about flow execution when it is run, referred to as a "run." Each time a run using the integration interacts with Dolt, it captures a small amount of metadata that makes that interaction reproducible. Since Dolt database root hashes are unique, this creates a mapping (roughly) between Metaflow runs and Dolt commits that can be exploited to provide users with powerful lineage and reproducibility features. 
 
 At the level of the Flow, the integration looks like this:
 
@@ -58,7 +58,7 @@ $ dolt clone dolthub/hospital-price-transparency && cd hospital-price-transparen
 
 ```
 
-Note this dataset is nearly 20 gigabytes, and could take a few minutes to clone. Once it's landed it's straightforward to jump write into SQL:
+Note this dataset is nearly 20 gigabytes, and could take a few minutes to clone. Once it's landed it's straightforward to jump right into SQL:
 ```
 $ dolt sql
 # Welcome to the DoltSQL shell.
@@ -89,7 +89,7 @@ We are going to use our example data pipeline, described at the outset, to test 
 The hypothesis we wish to test is this:
 > As the observation count increases, the procedure level price variance should decrease
 
-This is a crucial question in any data collection effort. The statistical regularity of the observations, combined with the cost of each observation, very directly impacts how effective such efforts are as a means of collecting data. 
+This is a crucial question in any data collection effort. The statistical regularity of the observations, combined with the cost of each observation, very directly impacts how effective such efforts are as a means of collecting data.
 
 As the bounty progressed, and participants added more data, our observation count grew. So we can test this hypothesis against various points in the commit graph. Let's jump into defining a Metaflow pipeline that will answer this question.
 
@@ -97,19 +97,42 @@ As the bounty progressed, and participants added more data, our observation coun
 Let's start by computing our medians:
 ```
 > poetry run python3 hospital_procedure_price_state_medians.py run \ 
---hospital-price-db path/to/hospital-price-transparency
---hospital-price-analysis-db path/to/hospital-price-analysis
+    --hospital-price-db path/to/hospital-price-transparency \ 
+    --hospital-price-analysis-db path/to/hospital-price-analysis
 ```
 
 We can then compute the variances:
 ```
 > poetry run python3 hospital_procedure_price_variance_by_state.py run \ 
---hospital-price-analysis-db path/to/hospital-price-analysis
+    --hospital-price-analysis-db path/to/hospital-price-analysis
 ```
 
 We now have our first result set computed, and estimate of the state level variances. Let's access them via the Metaflow client API:
+```python
+from metaflow import Flow
+from dolt_integrations.metaflow import DoltDT
+flow = Flow('HospitalProcedurePriceVarianceByState')
+run = flow.latest_successful_run
+dolt = DoltDT(run='HospitalProcedurePriceVarianceByState/1617129732667616')
+df = dolt.read('variance_by_procedure')
+print(df)
 ```
-# access the computed variances
+
+We see that we have successfully computed procedure level variance:
+```
+                    code         price
+0        CPT® 83520,1700  5.146559e+03
+1        CPT® 83520,1701  5.146559e+03
+2        CPT® 83520,1702  5.146559e+03
+3        CPT® 83520,1703  5.146559e+03
+4        CPT® 83520,1704  5.146559e+03
+                  ...           ...
+1314269           nan,13  2.057771e+06
+1314270            nan,2  1.269626e+05
+1314271            nan,3  8.994087e+03
+1314272            nan,4  1.498617e+05
+1314273            nan,5  2.541488e+05
+[1314274 rows x 2 columns]
 ```
 
 ### Hypothesis

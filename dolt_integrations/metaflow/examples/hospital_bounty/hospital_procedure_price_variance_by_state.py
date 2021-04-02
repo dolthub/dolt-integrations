@@ -18,13 +18,18 @@ class HospitalProcedurePriceVarianceByState(FlowSpec):
         "hospital-price-analysis-db-branch", help="Specify branch version", default="master",
     )
 
+    historical_run_path = Parameter(
+        "historical-run-path", help="Read the same data as a path to a previous run"
+    )
+
     @step
     def start(self):
         analysis_conf = DoltConfig(
             database=self.hospital_price_analysis_db,
             branch=self.hospital_price_analysis_db_branch
         )
-        with DoltDT(run=self, config=analysis_conf) as dolt:
+
+        with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
             median_price_by_state = dolt.read("state_procedure_medians")
             variance_by_procedure = median_price_by_state.groupby("code").var()
             dolt.write(variance_by_procedure, "variance_by_procedure")
