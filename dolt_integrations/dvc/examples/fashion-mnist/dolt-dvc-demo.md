@@ -1,14 +1,23 @@
-
 # Introduction
 
-The ML tooling space is changing quickly, budding hundreds of
+Today we explain how and why you would use Dolt and DVC together
+with a Fashion-MNIST demo. We will touch on several data versioning
+themes that Dolt and DVC tackle in different ways:
+1. Ease of access
+2. Remotes and sharing
+3. Lineage
+4. Reproducibility
+
+# Background
+
+The machine learning tooling space is changing quickly, budding hundreds of
 competing and overlapping narratives of how the future will
 look in data-land. Some projects, like Blue River, expand
 the capabilities of specific verticals, like autonomous tractors. Others
 like Weights and Biases support specific stages in the ML
 lifecycle, like training and result tracking.
 Other projects like Tecton and Databricks aim to redefine what
-MLOps-as-a-platform means at Enterprise-scale, making them harder
+machine learning ops (MLOps)-as-a-platform means at Enterprise-scale, making them harder
 to bucket and define.
 
 "Data versioning and reproducibility" has a deceivingly simple scope
@@ -29,22 +38,11 @@ versioning. DVC files committed to Git track data in S3 alongside Git
 source code. DVC facilitates a process by which a team can
 collaborate between those two mediums, Git and remote object stores.
 
-"Git for Data" and "Data Version Control" are colloquially
-synonyms, both are open-source projects, have similar star
-counts on Github, and growing developer communities on Discord.
-Both tailor towards data scientists seeking reproducibility.
-Because Dolt is an opinionated data store, and DVC is an opinionated
+"Git for Data" and "Data Version Control" are synonyms, which can be
+confusing. Because Dolt is an opinionated data store, and DVC is an opinionated
 process management software, we believe the two support one-another.
 The degree to which the two are complementary is difficult to answer
 abstractly, so we built an integration between them.
-
-In this blog, we explain how and why you would use Dolt and DVC together
-with a Fashion-MNIST demo. We will touch on several data versioning
-themes that Dolt and DVC tackle in different ways:
-1. Ease of access
-2. Remotes and sharing
-3. Lineage
-4. Reproducibility
 
 # Tutorial
 
@@ -61,21 +59,21 @@ We chose this example to showcase Dolt and DVC’s strengths:
    strictly-typed tabular data.
 
 When data is a mix of CSV/Parquet tables and blobs
-(like images), using Dolt and DVC together is interesting because Dolt
-does not store arbitrary files well, and DVC likewise does not provide
-unique support for tabular data.
+(like images), pairing Dolt and DVC is useful because Dolt
+does not store arbitrary files well, and DVC does not
+uniqely support tabular data.
 
 We divide input and output dependencies between Dolt and DVC.
 
-In the Dolt corner we store tabular data:
+We store tabular data in Dolt:
 1.Training and testing labels
 2.Prediction results (guessed and actual labels)
 
-With DVC we store images and binary blobs:
+We store images and binary blobs in DVC:
 1. Training and testing images
 2. Model weights and class pickle
 
-At the end of our workflow will use DVC to push the trained model to an object store:
+At the end of our workflow DVC can push the trained model to an object store:
 ```bash
 data/model
 ├── assets
@@ -85,19 +83,16 @@ data/model
     └── variables.index
 ```
 
-And Dolt to inspect results and associate models with results:
+We can also push Dolt databases for remote sharing. We will also use
+Dolt to inspect results between training runs:
 ```bash
-TODO -- results summary, not rows
-> dolt sql -q "select * from predictions limit 5"
-+--------+------+--------+
-| row_id | pred | actual |
-+--------+------+--------+
-| 66000  | 1    | 6      |
-| 66001  | 2    | 3      |
-| 66002  | 6    | 5      |
-| 66003  | 4    | 4      |
-| 66004  | 1    | 5      |
-+--------+------+--------+
+> dolt sql -q "select * from summary"
++-----------+--------------+--------------------------------------+--------+
+| loss      | label_branch | timestamp                            | acc    |
++-----------+--------------+--------------------------------------+--------+
+| 1.6994121 | fashion      | 2021-04-02 10:29:12.840018 +0000 UTC | 0.5352 |
+| 1.580542  | master       | 2021-04-02 10:43:14.570946 +0000 UTC | 0.6217 |
++-----------+--------------+--------------------------------------+--------+
 ```
 
 ## Setup
@@ -156,8 +151,8 @@ If we pulled files from an existing DVC repo the add step would be performed aut
 
 ### Dolt
 
-Creating a database requires a transform if the data is not already a
-CSV or similar file:
+Creating a database requires work if the data is not already organized
+as rows/columns:
 ```python
 In [1]: import os
    ...: import gzip
@@ -200,7 +195,7 @@ To track the changes with git, run:
 
 ### DVC
 
-We will push files to a local remote folder, but this works similarly with an S3 URL:
+We will push files to a local remote folder (this works similarly with an S3 URL):
 ```bash
 > mkdir -p /tmp/dvc-remote
 > dvc add dvc_remote /tmp/dvc-remote
@@ -254,31 +249,31 @@ And we are ready to run a training example:
     -n train \
     -d data/images \
     -d data/labels \
+    -d train.py \
     -o data/model \
     -o data/predictions \
     python train.py
 Epoch 1/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.5923 - accuracy: 0.5852
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.6889 - accuracy: 0.5248
 Epoch 2/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4209 - accuracy: 0.6550
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.5610 - accuracy: 0.5818
 Epoch 3/10
-1875/1875 [==============================] - 2s 979us/step - loss: 1.3852 - accuracy: 0.6608
+1875/1875 [==============================] - 2s 986us/step - loss: 1.5356 - accuracy: 0.5898
 Epoch 4/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.3795 - accuracy: 0.6590
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.5066 - accuracy: 0.6006
 Epoch 5/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.3458 - accuracy: 0.6659
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4952 - accuracy: 0.6038
 Epoch 6/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.3354 - accuracy: 0.6681
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4926 - accuracy: 0.6029
 Epoch 7/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.3177 - accuracy: 0.6686
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4769 - accuracy: 0.6067
 Epoch 8/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.3071 - accuracy: 0.6689
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4548 - accuracy: 0.6127
 Epoch 9/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.2764 - accuracy: 0.6741
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4657 - accuracy: 0.6100
 Epoch 10/10
-1875/1875 [==============================] - 2s 998us/step - loss: 1.2752 - accuracy: 0.6725
-313/313 - 0s - loss: 1.7931 - accuracy: 0.5620
-
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4414 - accuracy: 0.6138
+313/313 - 0s - loss: 1.5174 - accuracy: 0.6027
 ```
 
 A `dvc run` command translates to a stage in our `dvc.yaml` workflow file:
@@ -287,23 +282,23 @@ A `dvc run` command translates to a stage in our `dvc.yaml` workflow file:
 schema: '2.0'
 stages:
   train:
-    cmd: python train.py
+    cmd: python -d train.py train.py
     deps:
     - path: data/images
       md5: 9619f1bb9b50d0195a0af00656fb8bf4.dir
       size: 11594788
       nfiles: 5
     - path: data/labels
-      md5: tkcao72e0upe2umb2kokartgivd9keqc-pinisl8m4tfdecb8iikqhicta61nou9s-.dolt
-      size: 1463348
+      md5: pgubqbqgtvtmchilmb2btih47869dgt8-gl6c87hhtsnl3ktqd2u9r780c1hh2a38.dolt
+      size: 1465570
     outs:
     - path: data/model
-      md5: e0ac4164a31880e68ec64eb6db1a6507.dir
-      size: 1303322
+      md5: 4c251d267625d254b2f7edde800de85b.dir
+      size: 1303212
       nfiles: 3
     - path: data/predictions
-      md5: t65aqoe5ftkaqlkepqoaabnkq77mp8kn-of48sjsfirdudglo6m444fpqnsaddbhb-.dolt
-      size: 170002
+      md5: 6v00se9d2betcpadruk68trel1lmps0q-idanfgens9epcrqg5hdgnhq0bpif0icn.dolt
+      size: 260528
 ```
 
 DVC includes helper commands to visualize the pipeline:
@@ -366,26 +361,26 @@ updated fashion images and labels:
 'data/labels.dvc' didn't change, skipping
 > python train.py
 Epoch 1/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.6889 - accuracy: 0.5248
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.5923 - accuracy: 0.5852
 Epoch 2/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.5610 - accuracy: 0.5818
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.4209 - accuracy: 0.6550
 Epoch 3/10
-1875/1875 [==============================] - 2s 986us/step - loss: 1.5356 - accuracy: 0.5898
+1875/1875 [==============================] - 2s 979us/step - loss: 1.3852 - accuracy: 0.6608
 Epoch 4/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.5066 - accuracy: 0.6006
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.3795 - accuracy: 0.6590
 Epoch 5/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4952 - accuracy: 0.6038
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.3458 - accuracy: 0.6659
 Epoch 6/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4926 - accuracy: 0.6029
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.3354 - accuracy: 0.6681
 Epoch 7/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4769 - accuracy: 0.6067
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.3177 - accuracy: 0.6686
 Epoch 8/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4548 - accuracy: 0.6127
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.3071 - accuracy: 0.6689
 Epoch 9/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4657 - accuracy: 0.6100
+1875/1875 [==============================] - 2s 1ms/step - loss: 1.2764 - accuracy: 0.6741
 Epoch 10/10
-1875/1875 [==============================] - 2s 1ms/step - loss: 1.4414 - accuracy: 0.6138
-313/313 - 0s - loss: 1.5174 - accuracy: 0.6027
+1875/1875 [==============================] - 2s 998us/step - loss: 1.2752 - accuracy: 0.6725
+313/313 - 0s - loss: 1.7931 - accuracy: 0.5620
 Updating lock file 'dvc.lock'
 
 To track the changes with git, run:
@@ -401,7 +396,7 @@ Use `dvc push` to send your updates to remote storage.
 Data science iterations usually benefit from tracking differences between
 input and output datasets.
 
-MINST and Fashion-MNIST are completely different sets of images, but
+MINST and Fashion-MNIST are different sets of images, but
 random chance leaves about 1/N labels the same between the two that
 Dolt opportunistically deltas:
 ```bash
@@ -418,37 +413,76 @@ diff --dolt a/labels b/labels
 ```
 
 The motivation behind Fashion-MNIST, that models overfit digits and shirts
-are generally more difficult to categorize, can be seen by comparing
-accuracies between the training runs:
+are more difficult to categorize, can be seen by comparing
+accuracies between training runs:
 ```bash
-TODO use history to create correct or fail, then accuracy, test cnt, category_num
-> dolt sql -q “with”
+> dolt sql -q "with t as (
+  select
+    case
+      when p1.pred = p2.actual then 1
+      else 0
+    end as correct,
+    p1.actual,
+    p1.commit_hash
+  from dolt_history_predictions p1
+  join dolt_history_predictions p2
+    on p1.row_id = p2.row_id and
+       p1.commit_hash = p2.commit_hash
+  )
+  select
+    sum(correct)/count(*),
+    t.commit_hash,
+    count(*) as row_number,
+  from t
+  group by commit_hash"
++-----------------------+------------+----------------------------------+
+| sum(correct)/count(*) | row_number | commit_hash                      |
++-----------------------+------------+----------------------------------+
+| 0.6217                | 10000      | vq01vp8o1fsdq95eo4sutmppfhovejfv |
+| 0.5352                | 10000      | foo013e1hgej8oa0282bv1ecb9280mlh |
++-----------------------+------------+----------------------------------+
 ```
 
-A stored procedure might make it easier to automate tracking performance
-without having to query the entire commit history:
-```bash
-TODO dolt add and invoke procedure for the above
+We use the `dolt_history` table above to access every version of
+the prediction table, compare results, and calculate overall accuracy.
+Using the history table is necessary here because the predictions are
+replaced every iteration.
+
+We also added a summary row each training run, an easier way to
+incrememntally generate logs:
+```
+> > dolt sql -q "select * from summary"
++-----------+--------------+--------------------------------------+--------+
+| loss      | label_branch | timestamp                            | acc    |
++-----------+--------------+--------------------------------------+--------+
+| 1.6994121 | fashion      | 2021-04-02 10:29:12.840018 +0000 UTC | 0.5352 |
+| 1.580542  | master       | 2021-04-02 10:43:14.570946 +0000 UTC | 0.6217 |
++-----------+--------------+--------------------------------------+--------+
 ```
 
-One instance where we might want to access the commit history is for
+One instance where we might want to access the commit history is
 `dolt blame`’ing a data changes. For example, identifying who added
-the fashion branch:
+certain rows to the fashion branch:
 ```bash
-TODO find who added the fashion branch
+dolt blame fashion labels | head -n 5
++--------+----------------------------+-----------------+------------------------------+----------------------------------+
+| ROW_ID | COMMIT MSG                 | AUTHOR          | TIME                         | COMMIT                           |
++--------+----------------------------+-----------------+------------------------------+----------------------------------+
+| 14648  | Add Fashion labels         | Bojack Horseman | Wed Mar 31 16:20:50 PDT 2021 | 5fblpjp5neurvsfp989s6ea9lt01vd2q |
+| 27051  | Add Fashion labels         | Bojack Horseman | Wed Mar 31 16:20:50 PDT 2021 | 5fblpjp5neurvsfp989s6ea9lt01vd2q |
 ```
 
-You can learn more ways to use Dolt’s Git and SQL features
+You can learn more about how to use Dolt’s Git and SQL features
 [here](https://docs.dolthub.com).
 
 ## How Dolt Integrates With DVC
 
 ### Adding
 
-DVC’s main piece of metadata is a file-hash used to retrieve object versions.
-Usually, DVC hashes files and directories the same way as Git. To avoid
-duplicating what Dolt does internally, we substituted Dolt’s three-heads
-in-lieu of an md5 hash. Dolt
+DVC’s main metadata is the md5-hash used to sync local and remote
+filesystems. Usually, DVC hashes files and directories the same
+way as Git. To avoid duplicating what Dolt does internally, we
+substituted Dolt’s commits in-lieu of an md5 hash. Dolt
 heads tell us 1) the last commit, 2) the ongoing index/staging commit hash,
 and 3) the commit hash if all files in our working directory were committed
 now. Three-heads let us monitor whether the current database has changed
@@ -460,19 +494,21 @@ the appropriate database version.
 In DVC, output lineage is captured as Git-committed YAML files.
 Pre-defined output paths are saved as-is when a workflow completes.
 
-In Dolt, a user decides when to commit changes.
+Dolt users are responsoble for committing changes.
 If a new database state is committed within a workflow,
-DVC will record the new commit.
+DVC will track the new commit.
 If a tracked database is changed but not committed by the end of a
-workflow, then we have created an uncommitted transaction, a state that
+workflow, then we have an uncommitted transaction -- a state that
 Dolt cannot reproduce.
 ```bash
-TODO fix and show error for dirty status on add
+> dvc add
+Adding...
+ERROR: unexpected error - Dolt status is not clean; commit a reproducible state before adding.
 ```
 
 Fixing this error requires committing changes.
-Reaping the benefits of Dolt requires making state changes in the
-versioning format that Dolt persists, commits.
+Reaping the benefits of Dolt requires making state changes in Dolt's
+versioning format, the commit.
 
 ### Remotes
 
@@ -486,13 +522,19 @@ There are several differences between Dolt and DVC remotes
 
 # Conclusion
 
-Dolt excels at reproducibility for tabular data because commits,
-branches, merges and diffs are its fundamental building blocks.
 
-DVC creates a process by which data scientists can better organize their
+We walked through a Fashion-MNIST tutorial to highlight how Dolt
+and DVC can collaborate to offer more features to users.
+Dolt excels at reproducibility for tabular datasets. DVC creates a
+process by which data scientists can better organize their
 work and collaborate.
 
-todo -- summary
 
-todo -- call to action
+We will be releasing new integrations and tutorials every month to show
+how Dolt can complement applications with versioning, reproducibility and
+governance.
 
+If you are interested in hearing more about either
+[Dolt](https://discord.com/invite/RFwfYpu) or
+[DVC](https://discord.com/invite/dvwXA2N), reach
+out to us on our Discords.
