@@ -1,7 +1,7 @@
 # Introduction
 
-Today we explain how and why you would use Dolt and DVC together
-with a Fashion-MNIST demo. We will touch on several data versioning
+Today we explain how to use Dolt and DVC together
+using a Fashion-MNIST training demo. We touch on several data versioning
 themes that Dolt and DVC tackle in different ways:
 1. Ease of access
 2. Remotes and sharing
