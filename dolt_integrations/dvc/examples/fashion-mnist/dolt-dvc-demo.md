@@ -545,7 +545,7 @@ We will be releasing new integrations and tutorials every month to show
 how Dolt can complement applications with versioning, reproducibility and
 governance.
 
-If you are interested in hearing more about either
+If you are interested in learning more about either
 [Dolt](https://discord.com/invite/RFwfYpu) or
 [DVC](https://discord.com/invite/dvwXA2N), reach
-out to us on our Discords.
+out to us on Discord!
