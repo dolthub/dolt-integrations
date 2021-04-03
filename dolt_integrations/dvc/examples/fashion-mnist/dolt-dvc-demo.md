@@ -65,8 +65,6 @@ We chose this to tutorial to leverage Dolt and DVC’s strengths:
 We divide input and output dependencies between Dolt and DVC according
 to those strengths:
 
-TODO diagram
-
 We store tabular data in Dolt:
 1. Training and testing labels
 2. Prediction results (guessed and actual labels)
@@ -103,9 +101,6 @@ Finally, we will use Dolt to inspect results of several training runs:
 If you are intersted in digging more into the model training, refer to
 the [training
 tutorial](https://www.tensorflow.org/tutorials/keras/classification).
-
-![Prediction
-sample](https://www.tensorflow.org/tutorials/keras/classification_files/output_Ko-uzOufSCSe_0.png)
 
 ## Setup
 
