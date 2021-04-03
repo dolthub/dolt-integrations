@@ -16,33 +16,23 @@ look in data-land. Some projects, like Blue River, expand
 the capabilities of specific verticals, like autonomous tractors. Others
 like Weights and Biases support specific stages in the ML
 lifecycle, like training and result tracking.
-Other projects like Tecton and Databricks aim to redefine what
-machine learning ops (MLOps)-as-a-platform means at Enterprise-scale, making them harder
-to bucket and define.
 
 "Data versioning and reproducibility" has a deceivingly simple scope
-that masks the variety and difficulty of data capture, similar to
-platform projects.
+that masks the variety and difficulty of data capture.
 
 Consider two versioning tools: Dolt and Data Version Control.
 
-Dolt is a Git-versioned SQL database.
+Dolt is an SQL database with Git-versioning semantics.
 Tabular datasets in Dolt gain the powers of production databases
 (scalability, schema reliability, query language, logging) and Git
 (row-level commits, diffs, and merges, etc).
-Dolt is use-case unopinionated, and optimizes for delivering the
-experience of MySQL and Git using a novel storage layer.
 
-Data Version Control (DVC) offers ML project management and workflow
-versioning. DVC files committed to Git track data in S3 alongside Git
-source code. DVC facilitates a process by which a team can
-collaborate between those two mediums, Git and remote object stores.
+Data Version Control (DVC) uses workflow files to support team
+collaboration of Git source code and remote object stores.
 
-"Git for Data" and "Data Version Control" are synonyms, which can be
-confusing. Because Dolt is an opinionated data store, and DVC is an opinionated
-process management software, we believe the two support one-another.
-The degree to which the two are complementary is difficult to answer
-abstractly, so we built an integration between them.
+Because Dolt is an unopinionated data store, and DVC is an opinionated
+workflow manager, we believe the two support one-another.
+We built an integration to show how this works in practice.
 
 # Tutorial
 
@@ -59,36 +49,38 @@ digits.
 
 
 Fashion-MNIST is a drop-in replacement for MNIST with greyscale
-images of clothing. The designers of
-Fashion-MNIST believe MNIST is too easy, overused, and
-non-representative or modern computer vision tasks.
+images of clothing. The designers of Fashion-MNIST believe MNIST
+is 1) too easy, 2) overused, and 3) non-representative or modern
+computer vision tasks.
 
 ![Fashion-MNIST
 sample](https://www.tensorflow.org/tutorials/keras/classification_files/output_oZTImqg_CaW1_0.png)
 
-We chose this example to showcase Dolt and DVC’s strengths:
+We chose this to tutorial to leverage Dolt and DVC’s strengths:
 1. DVC documents workflows by recording commands and the metadata of files
    synced to remote file-systems.
 2. Dolt is a versioned SQL database with novel features for managing
    strictly-typed tabular data.
 
-When data is a mix of CSV/Parquet tables and blobs
-(like images), pairing Dolt and DVC is useful because Dolt
-does not store arbitrary files well, and DVC does not
-uniqely support tabular data.
+We divide input and output dependencies between Dolt and DVC according
+to those strengths:
 
-We divide input and output dependencies between Dolt and DVC.
+TODO diagram
 
 We store tabular data in Dolt:
-1.Training and testing labels
-2.Prediction results (guessed and actual labels)
+1. Training and testing labels
+2. Prediction results (guessed and actual labels)
 
 We store images and binary blobs in DVC:
 1. Training and testing images
 2. Model weights and class pickle
 
-At the end of our workflow DVC can push the trained model to an object store:
 ```bash
+data/labels
+data/predictions
+data/images
+├── t10k-images-idx3-ubyte.gz
+├── train-images-idx3-ubyte.gz
 data/model
 ├── assets
 ├── saved_model.pb
@@ -97,8 +89,7 @@ data/model
     └── variables.index
 ```
 
-We can also push Dolt databases for remote sharing. We will also use
-Dolt to inspect results between training runs:
+Finally, we will use Dolt to inspect results of several training runs:
 ```bash
 > dolt sql -q "select * from summary"
 +-----------+--------------+--------------------------------------+--------+
@@ -172,8 +163,15 @@ If we pulled files from an existing DVC repo the add step would be performed aut
 
 ### Dolt
 
-Creating a database requires work if the data is not already organized
-as rows/columns:
+Getting a [Dolt
+table ](https://www.dolthub.com/repositories/max-hoffman/mnist)
+is as simple as running a clone command:
+```bash
+> dolt clone max-hoffman/mnist data/labels
+```
+
+If you are not starting with an existing database, you would need to
+write a small program to import the data, like this:
 ```python
 In [1]: import os
    ...: import gzip
@@ -193,15 +191,7 @@ In [2]: os.makedirs("mnist", exist_ok=True)
    ...: db.sql("select DOLT_COMMIT('-am', 'Add MNIST labels')")
 ```
 
-Running this yourself is unnecessary. We have pre-computed MNIST and
-Fashion MNIST, which can be [viewed on
-DoltHub](https://www.dolthub.com/repositories/max-hoffman/mnist) and cloned
-locally with:
-```bash
-> dolt clone max-hoffman/mnist data/labels
-```
-
-DVC "adding" a dolt database creates a `.dvc` metadata file, but
+DVC "adding" a Dolt database creates a `.dvc` metadata file, but
 bypasses the cache because Dolt has its own storage format:
 ```bash
 dvc add data/labels
@@ -219,7 +209,7 @@ To track the changes with git, run:
 We will push files to a local remote folder (this works similarly with an S3 URL):
 ```bash
 > mkdir -p /tmp/dvc-remote
-> dvc add dvc_remote /tmp/dvc-remote
+> dvc remote add dvc_remote /tmp/dvc-remote
 > dvc push data/images -r dvc_remote
 ```
 
@@ -241,17 +231,17 @@ and finally checkout the new data according to the updated `data/images.dvc` spe
 
 ### Dolt
 
-Every command above also works with the Dolt DVC integration:
+The Dolt-DVC integration channels remote commands through dolt
+equivalents. The result is that pushing and pulling Dolt databases with DVC commands
+behaves the same as regular files:
 ```bash
 > mkdir -p /tmp/dolt-remote
-> dvc add dolt_remote /tmp/dolt-remote
-> dvc push data/ -r dolt_remote
-
-> git pull
-
-> dvc pull -r dolt_remote
-
-> dvc checkout data
+> dvc remote add dolt_remote /tmp/dolt-remote
+> dvc push data/labels -r dolt_remote
+1 file pushed
+> rm -rf data/labels
+> dvc pull data/labels -r dolt_remote
+1 file fetched
 ```
 
 ## Lineage
@@ -466,11 +456,11 @@ accuracies between training runs:
 
 We use the `dolt_history` table above to access every version of
 the prediction table, compare results, and calculate overall accuracy.
-Using the history table is necessary here because the predictions are
+Comuting every training accuracy requires the history table because predictions are
 replaced every iteration.
 
 We also added a summary row each training run, an easier way to
-incrememntally generate logs:
+incrementally generate logs:
 ```
 > > dolt sql -q "select * from summary"
 +-----------+--------------+--------------------------------------+--------+
