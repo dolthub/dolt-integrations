@@ -136,6 +136,9 @@ documentation](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/
 > dvc get git@github.com:dolthub/dolt-integrations.git dolt_integrations/dvc/examples/fashion_mnist/main.py
 ```
 
+Please reference the Tensorflow docs for tensorflow, keras and other
+training dependencies.
+
 ## Access Data
 
 ### DVC
@@ -541,14 +544,14 @@ all files in our working directory were committed now
 , 3) the ongoing index/staging commit hash.
 The first two, HEAD and working, let us monitor whether the
 database has changed since the most recent DVC-add. If necessary,
-the HEAD commit can be used to update to the appropriate database version.
+the HEAD commit can be used to checkout the appropriate database version.
 
 ## Commits
 
 In DVC, output lineage is captured as Git-committed YAML files.
 Pre-defined output paths are saved as-is when a workflow completes.
 
-Dolt users are responsoble for committing changes.
+Dolt users are responsible for committing changes.
 If a new database state is committed within a workflow,
 DVC will track the new commit.
 If a tracked database is changed but not committed by the end of a
