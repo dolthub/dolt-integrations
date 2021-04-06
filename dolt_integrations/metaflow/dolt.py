@@ -11,6 +11,7 @@ from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
 from doltcli import Dolt, DoltException
+from doltcli import read_rows
 from metaflow import FlowSpec, Run
 
 logger = logging.getLogger()
@@ -357,6 +358,43 @@ class DoltDTBase(object):
         from metaflow import current
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
+
+    def get_run(self, table: str, branch: str = 'master', commit: str = None) -> Run:
+        db = self._get_db(self._config)
+
+        if commit:
+            _commit = commit
+        else:
+            _, branches = db.branch()
+            filtered = [b for b in branches if b.name == branch]
+            if len(filtered) == 0:
+                raise ValueError(f'Branch {branch} not in list of branches {[b.name for b in branches]}')
+
+            _commit = filtered[0].hash
+
+        table_commit_update = read_rows(db, f'''
+            select 
+                count(*) as count 
+            from 
+                dolt_history_{table} 
+            where commit_hash = '{_commit}'
+        ''')
+
+        if table_commit_update[0]['count'] == 0:
+            raise ValueError(f'The table {table} was not updated at commit {_commit}')
+
+        commit_data = read_rows(db, '''
+            select 
+                commit_hash, 
+                message 
+            from 
+                dolt_commits 
+            where
+                message like 'Run: %' 
+        ''')
+        commit_to_run_map = {row['commit_hash']: row['message'].lstrip('Run: ') for row in commit_data}
+
+        return commit_to_run_map[_commit]
 
 
 class DoltBranchDT(DoltDTBase):

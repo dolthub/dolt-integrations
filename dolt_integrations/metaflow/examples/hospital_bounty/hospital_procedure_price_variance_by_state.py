@@ -1,7 +1,6 @@
 import logging
 
-import pandas as pd
-from metaflow import FlowSpec, Run, step, Parameter
+from metaflow import FlowSpec, step, Parameter
 from dolt_integrations.metaflow.dolt import DoltConfig, DoltDT
 
 logger = logging.getLogger()
