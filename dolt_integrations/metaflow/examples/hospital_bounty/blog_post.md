@@ -77,7 +77,7 @@ hospital_price_transparency> show tables;
 +-----------+
 ```
 
-Out the outset we said we were going to store the results in Dolt. To do so we need to create a Dolt database to write to:
+At the outset we said we were going to store the results in Dolt. To do so we need to create a Dolt database to write to:
 ```
 $ mkdir ~/hospital-price-analysis && cd ~/hospital-price-analysis
 $ dolt init
@@ -184,7 +184,12 @@ $ dolt branch metaflow-backtest gstcq5loi9ieqdv1elrljab9hcgr090p
 ```
 Before recomputing the medians let's create a branch in our `hospital-price-analysis` database associated with the root commit to store these experiments:
 ```
-
+$ cd path/to/hospital-price-analysis
+$ dolt branch
+* master
+  metaflow-backtest
+$ dolt checkout -b metaflow-change-test
+Switched to branch 'metaflow-change-test'
 ```
 
 Now let's kick off recomputing the medians. Since we are recomputing our medians from a historical version of the raw pricing data we will write them to a separate experimentation branch:
@@ -237,7 +242,7 @@ df = dolt.read('variance_by_procedure')
 print(df)
 ```
 
-Since this commit was taken from far earlier in the data gathering process, we can see far fewer unique procedure codes:
+Since this commit was taken from far earlier in the data gathering process, we can see far fewer unique procedure codes, 21K vs 1.17M:
 ```
            code        price
 0         0001A    184.03088
@@ -294,7 +299,7 @@ def start(self):
 
     with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
         median_price_by_state = dolt.read("state_procedure_medians")
-        clean = median_price_by_state[median_price_by_state['code'].str.startswith('nan')]
+        clean = median_price_by_state[~median_price_by_state['code'].str.startswith('nan')]
         variance_by_procedure = clean.groupby("code").var()
         dolt.write(variance_by_procedure, "variance_by_procedure")
 
@@ -305,23 +310,13 @@ def start(self):
 Reproducibility comes from passing the path to a previous run:
 ```python
 historical_run_path = Parameter(
-        "historical-run-path", help="Read the same data as a path to a previous run"
-    )
+    "historical-run-path", help="Read the same data as a path to a previous run"
+)
 ```
 
 We use that path as a parameter to `DoltDT`, which in turn causes `DoltDT` to read data in exactly the same way as the run specified by the provided run path:
 ```python
 with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
-```
-
-First, let's create a branch to write the output of our job to:
-```
-$ cd path/to/hospital-price-analysis
-$ dolt branch
-* master
-  metaflow-backtest
-$  dolt checkout -b metaflow-change-test
-Switched to branch 'metaflow-change-test'
 ```
 
 Looking back to our first run of the flow computing the medians, the run ID was `1617810636925188`. We can also see this in Dolt:
@@ -340,29 +335,59 @@ Date:   Wed Apr 07 09:02:21 -0700 2021
 	Run: HospitalPriceStateMedians/1617810636925188/start/1
 ```
 
-We can pass this run path straight into our job to achieve the desired data read isolation for testing our code changes:
+Let's crate a branch to reproduce our run on pinned to the commit we want to reproduce from:
+```
+$ cd path/to/hospital-price-analysis
+$ dolt branch
+* master
+  metaflow-backtest
+$  dolt branch metaflow-change 3je2okkrig5h3dbmuf8bhmfq0okps3lg
+```
+
+We can pass this branch straight into our job to achieve the desired data read isolation for testing our code changes:
 ```
 $ poetry run python3 hospital_procedure_price_variance_by_state.py run \
-    --hospital-price-analysis-db path/to/hospital-price-analysis \
-    --hospital-price-analysis-db-branch metaflow-change-test \
-    --historical-run-path HospitalPriceStateMedians/1617810636925188
+    --hospital-price-analysis-db ~/Documents/dolt-dbs/hospital-price-analysis \
+    --hospital-price-analysis-db-branch metaflow-change
 Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
 Validating your flow...
     The graph looks good!
 Running pylint...
     Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    	Pylint exception: RecursionError('maximum recursion depth exceeded')
     Skipping Pylint checks.
-2021-04-07 09:58:35.475 Workflow starting (run-id 1617814715468559):
-2021-04-07 09:58:35.483 [1617814715468559/start/1 (pid 24151)] Task is starting.
-2021-04-07 09:59:37.419 [1617814715468559/start/1 (pid 24151)] Task finished successfully.
-2021-04-07 09:59:37.429 [1617814715468559/end/2 (pid 24311)] Task is starting.
-2021-04-07 09:59:38.661 [1617814715468559/end/2 (pid 24311)] Task finished successfully.
-2021-04-07 09:59:38.661 Done!
+2021-04-07 15:11:15.634 Workflow starting (run-id 1617833475626845):
+2021-04-07 15:11:15.641 [1617833475626845/start/1 (pid 42039)] Task is starting.
+2021-04-07 15:12:17.799 [1617833475626845/start/1 (pid 42039)] Task finished successfully.
+2021-04-07 15:12:17.808 [1617833475626845/end/2 (pid 42199)] Task is starting.
+2021-04-07 15:12:19.046 [1617833475626845/end/2 (pid 42199)] Task finished successfully.
+2021-04-07 15:12:19.047 Done!
 ```
 
+
+We can now see that our procedure level variances have been filtered appropriately and we no longer have corrupt procedure codes in our dataset, first grabbing it using the run path:
+```python
+from dolt_integrations.metaflow import DoltDT
+from metaflow import Run
+doltdt = DoltDT(run=Run('HospitalProcedurePriceVarianceByState/1617833475626845'))
+df =doltdt.read('variance_by_procedure')
 ```
-# TODO, this is busted because in the previous step we didn't record our writes in a `.dolt` attribute
+
+And we see we have eliminated the corrupt procedure codes:
+```
+           index               code     price
+0         679855     CPT® 78710,103     0.000
+1         679856     CPT® 78710,104     0.000
+2         679857     CPT® 78710,105     0.000
+3         679858     CPT® 78710,106     0.000
+4         679859     CPT® 78710,107     0.000
+          ...                ...       ...
+1176681  2190407  HCPCS C1769,15784  5886.125
+1176682  2190408  HCPCS C1769,15785  5886.125
+1176683  2190409  HCPCS C1769,15786  5886.125
+1176684  2190410  HCPCS C1769,15787  5886.125
+1176685  2190411  HCPCS C1769,15788  5886.125
+[1176686 rows x 3 columns]
 ```
 
 By simply retrieving a run path, and kicking off our variances flow, we were able to reproduce the exact inputs of a historical run. We were able to directly diff the data produced from the Metaflow API used alongside the integration.
@@ -377,21 +402,50 @@ Obviously a real world example might have a much more complicated data dependenc
 ```python
 from dolt_integrations.metaflow import DoltDT, DoltConfig
 downstream_doltdt = DoltDT(config=DoltConfig(database='/Users/oscarbatori/Documents/dolt-dbs/hospital-price-analysis'))
-run = downstream_doltdt.get_run('state_procedure_medians')
+run = downstream_doltdt.get_run('variance_by_procedure')
 print(run)
 ```
 
-Which produces a Metaflow run object:
+Which produces a Metaflow run path:
 ```
 'HospitalProcedurePriceVarianceByState/1617811645255563/start/1'
 ```
 
-We now have the run ID of flow that produced the medians form which we computed our variances. We can access the raw data, again directly from the integration:
+We now have the run ID of flow that produced the medians form which we computed our variances. We can access the flow that wrote the medians in a similar manner:
 ```python
-# TODO busted by the bug of adding audit when a previous run is passed in
-medians_doltdt = DoltDT(run=run.id)
-df = medians_doltdt.read('prices')
+commit = Run('HospitalProcedurePriceVarianceByState/1617811645255563').data.dolt['actions']['state_procedure_medians']['commit']
+run = downstream_doltdt.get_run('state_procedure_medians', commit)
+print(run)
+```
+
+And we have traced back to the medians job that originally produced this data:
+```
+'HospitalPriceStateMedians/1617810636925188/start/1'
+```
+
+As a final step we can pull at the input data, since we stored in Dolt:
+```python
+upstream_doltdt = DoltDT(run=Run('HospitalPriceStateMedians/1617810636925188'))
+df = upstream_doltdt.read('prices')
 print(df)
+```
+
+Which yields the original input dataset we started out with:
+```
+Out[10]: 
+            npi_number  ...     price
+0         1053358010.0  ...  75047.00
+1           1336186394  ...  75047.00
+2         1003139775.0  ...    457.23
+3         1053824292.0  ...    972.00
+4         1417901406.0  ...    296.00
+                ...  ...       ...
+72724847    1184897647  ...   3724.00
+72724848    1003858408  ...     96.11
+72724849    1003858408  ...     94.53
+72724850    1598917866  ...     22.00
+72724851    1598917866  ...     15.40
+[72724852 rows x 4 columns]
 ```
 
 By storing Metaflow results in Dolt, result sets can be associated with flows and the input datasets. When results from Metaflow are put into other data stores we don't have a way to trace the table back to flow run that produced it. 

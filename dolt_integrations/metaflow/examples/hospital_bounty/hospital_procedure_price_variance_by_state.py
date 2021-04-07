@@ -1,6 +1,6 @@
 import logging
 
-from metaflow import FlowSpec, step, Parameter
+from metaflow import FlowSpec, step, Parameter, Run
 from dolt_integrations.metaflow.dolt import DoltConfig, DoltDT
 
 logger = logging.getLogger()
@@ -27,11 +27,12 @@ class HospitalProcedurePriceVarianceByState(FlowSpec):
             database=self.hospital_price_analysis_db,
             branch=self.hospital_price_analysis_db_branch
         )
+        audit = Run(self.historical_run_path).data.dolt if self.historical_run_path else None
 
-        with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
+        with DoltDT(run=self, config=analysis_conf, audit=audit) as dolt:
             median_price_by_state = dolt.read("state_procedure_medians")
-            variance_by_procedure = median_price_by_state.groupby("code").var()
-            clean = median_price_by_state[median_price_by_state['code'].str.startswith('nan')]
+            variance_by_procedure = median_price_by_state.groupby("code").var().reset_index()
+            variance_by_procedure = variance_by_procedure[~variance_by_procedure['code'].str.startswith('nan')]
             dolt.write(variance_by_procedure, "variance_by_procedure")
 
         self.next(self.end)

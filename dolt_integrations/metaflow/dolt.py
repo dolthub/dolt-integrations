@@ -450,22 +450,18 @@ class DoltAuditDT(DoltDTBase):
 
 
 def DoltDT(
-        run: Optional[Union[FlowSpec, str]] = None,
-        audit: Optional[dict] = None,
-        config: Optional[DoltConfig] = None,
+    run: Optional[Union[str, FlowSpec]] = None,
+    audit: Optional[dict] = None,
+    config: Optional[DoltConfig] = None,
 ):
+    _run = Run(run) if type(run) == str else run
     if config and audit:
-        raise ValueError("Specify audit or config mode, not both.")
+        logger.warning("Specified audit or config mode, will use aduit.")
     elif audit:
-        return DoltAuditDT(audit=audit, run=run)
-    elif run and not config:
-        _run = Run(run) if type(run) == str else run
-        if hasattr(_run, "data") and hasattr(_run.data, "dolt"):
-            return DoltAuditDT(audit=_run.data.dolt, run=_run)
-        else:
-            raise ValueError(f'Run path {run} passed, but associated run does not have data and dolt attributes')
+        return DoltAuditDT(audit=audit, run=_run)
     elif config:
-        _run = Run(run) if type(run) == str else run
         return DoltBranchDT(_run, config)
+    elif _run and hasattr(_run, "data") and hasattr(_run.data, "dolt"):
+        return DoltAuditDT(audit=_run.data.dolt, run=_run)
     else:
         raise ValueError("Specify one of: audit, config")
