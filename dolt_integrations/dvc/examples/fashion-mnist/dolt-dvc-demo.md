@@ -235,8 +235,8 @@ and finally checkout the new data according to the updated `data/images.dvc` spe
 ### Dolt
 
 The Dolt-DVC integration channels remote commands through dolt
-equivalents. The result is that pushing and pulling Dolt databases with DVC commands
-behaves the same as regular files:
+equivalents. Pushing and pulling Dolt databases with DVC commands
+works the same as regular files:
 ```bash
 > mkdir -p /tmp/dolt-remote
 > dvc remote add dolt_remote /tmp/dolt-remote
@@ -577,7 +577,7 @@ preddb = dolt.Dolt("data/predictions")
 preddb.sql(f"select dolt_commit('-am', 'New workflow run at {ts}')")
 ```
 
-Reaping the benefits of Dolt requires making state changes in Dolt's
+Dolt's benefits flow downstream of Dolt's
 versioning format, the commit.
 
 ### Remotes
