@@ -10,21 +10,21 @@ themes that Dolt and DVC tackle in different ways:
 
 # Background
 
-The machine learning tooling space is changing quickly, budding hundreds of
-competing and overlapping narratives of how the future will
-look in data-land. Some projects, like Blue River, expand
+The machine learning tooling space has seen hundreds of new projects
+budding over the last few years.
+Some projects, like Blue River, expand
 the capabilities of specific verticals, like autonomous tractors. Others
 like Weights and Biases support specific stages in the ML
 lifecycle, like training and result tracking.
 
-"Data versioning and reproducibility" has a deceivingly simple scope
-that masks the variety and difficulty of data capture.
+"Data versioning and reproducibility" sounds simple in theory, but can be
+operationally complex.
 
 Consider two versioning tools: Dolt and Data Version Control.
 
 Dolt is an SQL database with Git-versioning semantics.
-Tabular datasets in Dolt gain the powers of production databases
-(scalability, schema reliability, query language, logging) and Git
+Tabular datasets in Dolt gain the powers of: 1) production databases
+(scalability, schema reliability, query language, logging); and 2) Git
 (row-level commits, diffs, and merges, etc).
 
 Data Version Control (DVC) uses workflow files to support team
@@ -116,7 +116,7 @@ sudo bash -c 'curl -L https://github.com/dolthub/dolt/releases/latest/download/i
 
 Clone and install DVC's `dolt-integration` branch:
 ```bash
-> git clone git@github.com:iterative/dvc.git
+> git clone git@github.com:dolthub/dvc.git
 > cd dvc
 > dvc checkout dolt/integration
 > pip install --user .
@@ -136,7 +136,7 @@ documentation](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/
 > dvc get git@github.com:dolthub/dolt-integrations.git dolt_integrations/dvc/examples/fashion_mnist/main.py
 ```
 
-Please reference the Tensorflow docs for tensorflow, keras and other
+Please reference the Tensorflow docs for `tensorflow`, `keras` and other
 training dependencies.
 
 ## Access Data
@@ -167,7 +167,7 @@ If we pulled files from an existing DVC repo the add step would be performed aut
 ### Dolt
 
 Getting a [Dolt
-table ](https://www.dolthub.com/repositories/max-hoffman/mnist)
+table](https://www.dolthub.com/repositories/max-hoffman/mnist)
 is as simple as running a clone command:
 ```bash
 > dolt clone max-hoffman/mnist data/labels
@@ -222,7 +222,7 @@ new DVC metadata:
 > git pull
 ```
 
-then download remotes into our cache:
+Then download remotes into our cache:
 ```bash
 > dvc pull -r dvc_remote
 ```
@@ -259,7 +259,7 @@ Remove and restore the database with both branches:
 1 file fetched
 ```
 
-If you accidentally switch up the mnist images and labels, and fall back
+If you accidentally switch up the MNIST images and labels, and fall back
 to random accuracy of prediction:
 ```bash
 dolt sql -q "select * from summary"
@@ -540,7 +540,7 @@ outs:
 ```
 
 Dolt's three  heads tell us 1) the last commit, 2) the hash if
-all files in our working directory were committed now
+all rows in our working database were committed now
 , 3) the ongoing index/staging commit hash.
 The first two, HEAD and working, let us monitor whether the
 database has changed since the most recent DVC-add. If necessary,
@@ -592,13 +592,11 @@ There are several differences between Dolt and DVC remotes
 
 # Conclusion
 
-
-We walked through a Fashion-MNIST tutorial to highlight how Dolt
+We walked through a Fashion-MNIST tutorial to show how Dolt
 and DVC can collaborate to offer more features to users.
 Dolt excels at reproducibility for tabular datasets. DVC creates a
 process by which data scientists can better organize their
 work and collaborate.
-
 
 We will be releasing new integrations and tutorials every month to show
 how Dolt can complement applications with versioning, reproducibility and
