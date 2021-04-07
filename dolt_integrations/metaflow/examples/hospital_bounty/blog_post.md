@@ -3,30 +3,31 @@ title: Introducing Dolt + Metaflow
 ---
 
 ## Background
-This post details how to use Metaflow with Dolt. [Metaflow](https://metaflow.org/) is a workflow manager that offers data scientists the ability to define local experiments and scale those experiments to production jobs from a single API. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features. Each commit corresponds to a complete state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
+This post details how to use Metaflow with Dolt. [Metaflow](https://metaflow.org/) is a workflow manager that offers data scientists the ability to define local experiments and scale those experiments to production jobs from a single API. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features. Each commit corresponds to the state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
 
-To illustrate the power of integrating Metaflow and Dolt, we use an example Metaflow pipeline to produce a Pandas DataFrame stored in a Dolt database for use by application layer services. The goal is for application layer code to read from datasets that are versioned and reproducible to create a more healthy boundary between data science production services using Dolt's version control features:
+To illustrate the power of integrating Metaflow and Dolt, we use an example Metaflow pipeline to derive results data from an input dataset. We read the input data into a Pandas DataFrame and convert that DataFrame to permanent storage in Dolt for use with application layer services with an intermediate step. Dolt SQL Server can be used to serve this versioned and reproducible data over MySQL connectors:
+
 ![Data Architecture](dolt-metaflow-integration-data-architecture.png)
 
-This blog post will breakdown how to use Dolt to augment Metaflow based pipelines with full reproducibility, lineage, and back-testing capabilities for tabular data read from and written to Dolt. Dolt allows users to see where their data came from, what it looked like at every transformation, and to feed historical versions of it into subsequent flow runs.
+This blog post will breakdown how to use Dolt to augment Metaflow based pipelines with full reproducibility, lineage, and back-testing capabilities for tabular data. Dolt allows users to see where their data came from, what it looked like at every transformation, and to feed historical versions of it into subsequent flow runs.
 
 ## Example Pipeline
-Our pipeline consists of two flows. One flow consumes the results written by the other. The first flow computes the state level median price for a hospital procedure. The second flow computes the variance of the price for a procedure across states. 
+Our pipeline consists of two flows. One flow consumes the results written by the other. The first flow computes the state level median price for a hospital procedure. The second flow computes the variance of the price for a procedure across states. For input data we chose a new public [dataset](https://www.dolthub.com/repositories/dolthub/hospital-price-transparency) of 1400 US hospital prices created using DoltHub [data bounties](https://www.dolthub.com/bounties). Our pipeline will look something like this:
 
 ![image here](dolt-metaflow-pipeline.png)
 
 We will use the end result to illustrate how integrating Dolt and Metaflow provides Metaflow users with the ability to traverse versions of their final data, as well as traceback through the pipeline to examine various stages. Users can do this via the Metaflow API and Dolt integration in a familiar environment like a console or a notebook.
 
 ## How it Works
-Our design goal with this integration was to give the Metaflow user additional capabilities directly from Metaflow. We wanted to minimize the additional API surface area required.
+Our design goal with this integration was to give the Metaflow user additional capabilities directly from Metaflow. We wanted to minimize additional API surface area.
 
-Workflows in Metaflow are called "flows." Each flow stores metadata about flow execution, referred to as a "run." Each time a run interacts with Dolt it captures a small amount of metadata that makes that interaction reproducible. Since Dolt database root hashes are unique, this creates a mapping (roughly) between Metaflow runs and Dolt commits that can be exploited to provide users with powerful lineage and reproducibility features. 
+Workflows in Metaflow are called "flows." Each flow stores metadata about flow execution, referred to as a "run." Each time a run interacts with Dolt, we capture a small amount of metadata to make that interaction reproducible. We create a mapping between Metaflow runs and Dolt commits to provide users with powerful lineage and reproducibility features.
 
-At the level of the Flow, the integration looks like this, with the runs of a flow reading from and writing Pandas DataFrame objects to and from Dolt:
+Runs of a flow read and write Pandas DataFrame objects to Dolt:
 
 ![Flow level view](dolt-metaflow-integration-flow-level.png)
 
-Drilling into one of the runs, the individual steps can create separate commits that snapshot the state of the database they create:
+Individual steps of a run can create separate commits that snapshot the state of the database following a write:
 
 ![Run level view](dolt-metaflow-integration-run-level.png)
 
@@ -55,7 +56,7 @@ pip install doltpy-integraions[metaflow]
 ```
 
 ### Get The Data
-The final step is to acquire the dataset. Becuase Dolt is a SQL database with Git-like version control features, it includes the ability to clone a remote to your local machine. We can use that feature to easily acquire a dataset:
+The final step is to acquire the dataset. Because Dolt is a SQL database with Git-like version control features, it includes the ability to clone a remote to your local machine. We can use that feature to easily acquire a Dolt database from a remote:
 ```
 $ dolt clone dolthub/hospital-price-transparency && cd hospital-price-transparency
 ```
@@ -76,7 +77,7 @@ hospital_price_transparency> show tables;
 +-----------+
 ```
 
-Finally let's create a Dolt database for our downstream results:
+Out the outset we said we were going to store the results in Dolt. To do so we need to create a Dolt database to write to:
 ```
 $ mkdir ~/hospital-price-analysis && cd ~/hospital-price-analysis
 $ dolt init
@@ -91,12 +92,37 @@ Before we get into the details, let's first produce a run of our pipeline off th
 $ poetry run python3 hospital_procedure_price_state_medians.py run \ 
     --hospital-price-db path/to/hospital-price-transparency \ 
     --hospital-price-analysis-db path/to/hospital-price-analysis
+Metaflow 2.2.8 executing HospitalPriceStateMedians for user:oscarbatori
+Validating your flow...
+    The graph looks good!
+Running pylint...
+    Pylint couldn't analyze your code.
+    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    Skipping Pylint checks.
+2021-04-07 08:50:36.934 Workflow starting (run-id 1617810636925188):
+2021-04-07 08:50:36.941 [1617810636925188/start/1 (pid 21075)] Task is starting.
+2021-04-07 09:02:36.095 [1617810636925188/start/1 (pid 21075)] Task finished successfully.
+2021-04-07 09:02:36.136 [1617810636925188/end/2 (pid 21257)] Task is starting.
+2021-04-07 09:02:37.697 [1617810636925188/end/2 (pid 21257)] Task finished successfully.
+2021-04-07 09:02:37.698 Done!
 ```
 
 The second flow computes the variance in median procedure price across states:
 ```
 $ poetry run python3 hospital_procedure_price_variance_by_state.py run \ 
     --hospital-price-analysis-db path/to/hospital-price-analysis
+Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
+Validating your flow...
+    The graph looks good!
+Running pylint...
+    Pylint couldn't analyze your code.
+    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    Skipping Pylint checks.
+2021-04-07 09:07:25.262 Workflow starting (run-id 1617811645255563):
+2021-04-07 09:07:25.269 [1617811645255563/start/1 (pid 21299)] Task is starting.
+2021-04-07 09:08:25.200 [1617811645255563/end/2 (pid 21349)] Task is starting.
+2021-04-07 09:08:25.982 [1617811645255563/end/2 (pid 21349)] Task finished successfully.
+2021-04-07 09:08:25.983 Done!
 ```
 
 We now have our first result set computed. Let's access the computed variances via the integration, using the flow as an entry point:
@@ -110,25 +136,25 @@ print(df)
 
 We see that we have successfully computed procedure level variance:
 ```
-                    code         price
-0        CPT® 83520,1700  5.146559e+03
-1        CPT® 83520,1701  5.146559e+03
-2        CPT® 83520,1702  5.146559e+03
-3        CPT® 83520,1703  5.146559e+03
-4        CPT® 83520,1704  5.146559e+03
-                  ...           ...
-1314269           nan,13  2.057771e+06
-1314270            nan,2  1.269626e+05
-1314271            nan,3  8.994087e+03
-1314272            nan,4  1.498617e+05
-1314273            nan,5  2.541488e+05
-[1314274 rows x 2 columns]
+                  code        price
+0        CPT® 86708,72      253.125
+1        CPT® 86708,73      253.125
+2        CPT® 86708,74      253.125
+3        CPT® 86708,75      253.125
+4        CPT® 86708,76      253.125
+                ...          ...
+1176694          nan,5   254148.840
+1176695          nan,6   326868.470
+1176696          nan,7   779888.100
+1176697          nan,8  2152957.800
+1176698          nan,9  4031522.000
+[1176699 rows x 2 columns]
 ```
 
 We have seen it's relatively straightforward to run our pipeline, and access our versioned results via a reference to the flow that produced them. We now dive into some of the capabilities this provides Metaflow users who choose to use Dolt in their infrastructure.
 
 ### Back-testing
-In this example our input dataset is stored in Dolt. We used a DoltHub dataset because it's easy to clone the dataset and get started, and afterall this post is about integrating Dolt with Metaflow. But having our input dataset in Dolt isn't just a matter of convenience for this post. Because every Dolt commit represents the complete state of the database at a point in time, we can actually easily point our pipeline to historical versions of the data. Let's examine the Dolt commit graph and grab a commit straight from the SQL console:
+In this example our input dataset is stored in Dolt. We used a DoltHub dataset because it's easy to clone the dataset and get started, and afterall this post is about integrating Dolt with Metaflow. But having our input dataset in Dolt isn't just a matter of convenience for this post. Because every Dolt commit represents the complete state of the database at a point in time, we can easily point our pipeline to historical versions of the data. Let's examine the Dolt commit graph and grab a commit straight from the SQL console:
 ```
 $ cd path/to/hospital-price-transparency
 $ dolt sql
@@ -152,9 +178,13 @@ hospital_price_transparency> select commit_hash, message from dolt_commits where
 +----------------------------------+------------------------------------------------------------+
 ```
 
-Suppose we'd like to run our pipeline with input data as of commit `gstcq5loi9ieqdv1elrljab9hcgr090p`. That's easy enough, first let's name the commit with a branch:
+Suppose we'd like to run our pipeline with input data as of commit `gstcq5loi9ieqdv1elrljab9hcgr090p`, the first one labeled "Updating hospitals with changes from hospitals.csv." That's easy enough, first let's name the commit with a branch:
 ```
 $ dolt branch metaflow-backtest gstcq5loi9ieqdv1elrljab9hcgr090p
+```
+Before recomputing the medians let's create a branch in our `hospital-price-analysis` database associated with the root commit to store these experiments:
+```
+
 ```
 
 Now let's kick off recomputing the medians. Since we are recomputing our medians from a historical version of the raw pricing data we will write them to a separate experimentation branch:
@@ -164,6 +194,19 @@ $ poetry run python3 hospital_procedure_price_state_medians.py run \
     --hospital-price-db-branch metaflow-backtest \
     --hospital-price-analysis-db path/to/hospital-price-analysis \
     --hospital-price-analysis-db-branch metaflow-backtest
+Metaflow 2.2.8 executing HospitalPriceStateMedians for user:oscarbatori
+Validating your flow...
+    The graph looks good!
+Running pylint...
+    Pylint couldn't analyze your code.
+    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    Skipping Pylint checks.
+2021-04-07 09:20:00.883 Workflow starting (run-id 1617812400875290):
+2021-04-07 09:20:00.889 [1617812400875290/start/1 (pid 21700)] Task is starting.
+2021-04-07 09:20:20.254 [1617812400875290/start/1 (pid 21700)] Task finished successfully.
+2021-04-07 09:20:20.264 [1617812400875290/end/2 (pid 21776)] Task is starting.
+2021-04-07 09:20:21.422 [1617812400875290/end/2 (pid 21776)] Task finished successfully.
+2021-04-07 09:20:21.423 Done!
 ```
 
 And the variances can be run similarly, again using the experimentation branch:
@@ -171,6 +214,18 @@ And the variances can be run similarly, again using the experimentation branch:
 $ poetry run python3 hospital_procedure_price_variance_by_state.py run \ 
     --hospital-price-analysis-db path/to/hospital-price-analysis \
     --hospital-price-analysis-db-branch metaflow-backtest
+Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
+Validating your flow...
+    The graph looks good!
+Running pylint...
+    Pylint couldn't analyze your code.
+    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    Skipping Pylint checks.
+2021-04-07 09:21:12.296 Workflow starting (run-id 1617812472287058):
+2021-04-07 09:21:12.303 [1617812472287058/start/1 (pid 21827)] Task is starting.
+2021-04-07 09:21:16.321 [1617812472287058/end/2 (pid 21871)] Task is starting.
+2021-04-07 09:21:17.283 [1617812472287058/end/2 (pid 21871)] Task finished successfully.
+2021-04-07 09:21:17.284 Done!
 ```
 
 We can now query the results directly from Python:
@@ -182,14 +237,45 @@ df = dolt.read('variance_by_procedure')
 print(df)
 ```
 
-Or we can use Dolt SQL to query the results directly:
+Since this commit was taken from far earlier in the data gathering process, we can see far fewer unique procedure codes:
+```
+           code        price
+0         0001A    184.03088
+1         0001M  12250.82000
+2         0001U  35871.70000
+3         0002A    275.67660
+4         0002M      0.00000
+         ...          ...
+21332  L1830-00     13.41620
+21333  L1830-01      9.24500
+21334  L1830-02     20.22480
+21335  L1830-03    247.53125
+21336  L1830-04     35.70125
+[21337 rows x 2 columns]
+```
+
+Or we can use Dolt SQL's `AS OF` syntax to query the results of our backtest:
 ```
 $ cd path/to/hospital-price-analysis
 $ dolt sql
 # Welcome to the DoltSQL shell.
 # Statements must be terminated with ';'.
 # "exit" or "quit" (or Ctrl-D) to exit.
-hospital_price_analysis> 
+hospital_price_analysis> select * from variance_by_procedure as of 'metaflow-backtest' order by price desc limit 10;
++-------+---------------+
+| code  | price         |
++-------+---------------+
+| Q2042 | 5.9482256e+11 |
+| Q2041 | 5.1718203e+11 |
+| 216   | 1.2761694e+11 |
+| J3399 | 9.192812e+10  |
+| Q4142 | 1.604416e+10  |
+| 0100T | 1.4931476e+10 |
+| C9293 | 9.202785e+09  |
+| 47133 | 8.558203e+09  |
+| 90288 | 8.4152607e+09 |
+| J7311 | 8.2143995e+09 |
++-------+---------------+
 ```
 
 In this section we saw how storing flow inputs in Dolt makes back-testing straightforward. Dolt's commit graph makes it straight forward to specify a historical database state. 
@@ -228,17 +314,55 @@ We use that path as a parameter to `DoltDT`, which in turn causes `DoltDT` to re
 with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
 ```
 
-Let's kick off this reproducible run:
+First, let's create a branch to write the output of our job to:
 ```
-$ poetry run python3 hospital_procedure_price_variance_by_state.py run \ 
-    --hospital-price-analysis-db path/to/hospital-price-analysis
-    --hospital-price-analysis-db-branch metaflow-change-test
-    --historical-run-path <path/to/metaflow/run>
+$ cd path/to/hospital-price-analysis
+$ dolt branch
+* master
+  metaflow-backtest
+$  dolt checkout -b metaflow-change-test
+Switched to branch 'metaflow-change-test'
 ```
 
-We can now perform a diff between the two resutls:
+Looking back to our first run of the flow computing the medians, the run ID was `1617810636925188`. We can also see this in Dolt:
 ```
-show diff
+dolt log
+commit lmjqpf293qg9ma10r034htt7jhfu5c4f
+Author: oscarbatori <oscarbatori@gmail.com>
+Date:   Wed Apr 07 09:08:24 -0700 2021
+
+	Run: HospitalProcedurePriceVarianceByState/1617811645255563/start/1
+
+commit 3je2okkrig5h3dbmuf8bhmfq0okps3lg
+Author: oscarbatori <oscarbatori@gmail.com>
+Date:   Wed Apr 07 09:02:21 -0700 2021
+
+	Run: HospitalPriceStateMedians/1617810636925188/start/1
+```
+
+We can pass this run path straight into our job to achieve the desired data read isolation for testing our code changes:
+```
+$ poetry run python3 hospital_procedure_price_variance_by_state.py run \
+    --hospital-price-analysis-db path/to/hospital-price-analysis \
+    --hospital-price-analysis-db-branch metaflow-change-test \
+    --historical-run-path HospitalPriceStateMedians/1617810636925188
+Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
+Validating your flow...
+    The graph looks good!
+Running pylint...
+    Pylint couldn't analyze your code.
+    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
+    Skipping Pylint checks.
+2021-04-07 09:58:35.475 Workflow starting (run-id 1617814715468559):
+2021-04-07 09:58:35.483 [1617814715468559/start/1 (pid 24151)] Task is starting.
+2021-04-07 09:59:37.419 [1617814715468559/start/1 (pid 24151)] Task finished successfully.
+2021-04-07 09:59:37.429 [1617814715468559/end/2 (pid 24311)] Task is starting.
+2021-04-07 09:59:38.661 [1617814715468559/end/2 (pid 24311)] Task finished successfully.
+2021-04-07 09:59:38.661 Done!
+```
+
+```
+# TODO, this is busted because in the previous step we didn't record our writes in a `.dolt` attribute
 ```
 
 By simply retrieving a run path, and kicking off our variances flow, we were able to reproduce the exact inputs of a historical run. We were able to directly diff the data produced from the Metaflow API used alongside the integration.
@@ -251,14 +375,20 @@ In the previous section we showed how to run one Flow using the inputs of a prev
 Obviously a real world example might have a much more complicated data dependency graph, making this kind of tracking all the more important. Let's see how we would trace the lineage of the final variances. The first thing to do is grab the run that created the current production data:
 
 ```python
-from dolt_integrations.metaflow import DoltDT
-downstream_doltdt = DoltDT(config=DoltConfig(database='path/to/hospital-price-analysis'))
+from dolt_integrations.metaflow import DoltDT, DoltConfig
+downstream_doltdt = DoltDT(config=DoltConfig(database='/Users/oscarbatori/Documents/dolt-dbs/hospital-price-analysis'))
 run = downstream_doltdt.get_run('state_procedure_medians')
-print(run.id)
+print(run)
+```
+
+Which produces a Metaflow run object:
+```
+'HospitalProcedurePriceVarianceByState/1617811645255563/start/1'
 ```
 
 We now have the run ID of flow that produced the medians form which we computed our variances. We can access the raw data, again directly from the integration:
 ```python
+# TODO busted by the bug of adding audit when a previous run is passed in
 medians_doltdt = DoltDT(run=run.id)
 df = medians_doltdt.read('prices')
 print(df)

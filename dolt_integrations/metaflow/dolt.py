@@ -6,12 +6,13 @@ import logging
 import time
 from typing import Dict, List, Optional, Union
 import uuid
+import os
 
 from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
 from doltcli import Dolt, DoltException
-from doltcli import read_rows
+from doltcli import read_rows, read_rows_sql
 from metaflow import FlowSpec, Run
 
 logger = logging.getLogger()
@@ -332,11 +333,19 @@ class DoltDTBase(object):
         except DoltException as e:
             pass
 
+        if '.dolt' not in os.listdir(config.database):
+            raise ValueError(f'Passed a path {config.database} that is not a Dolt database directory')
+
         doltdb = Dolt(repo_dir=config.database)
-        try:
-            doltdb.checkout(config.branch, checkout_branch=False)
-        except DoltException as e:
+        current_branch, branches = doltdb.branch()
+
+        logger.info(f'Dolt database in {config.database} at branch {current_branch.name}, using branch {config.branch}')
+        if config.branch == current_branch.name:
             pass
+        elif config.branch not in [branch.name for branch in branches]:
+            raise ValueError(f"Passed branch '{config.branch}' that does not exist")
+        else:
+            doltdb.checkout(config.branch, checkout_branch=False)
 
         if not doltdb.status().is_clean:
             raise Exception(
@@ -372,7 +381,7 @@ class DoltDTBase(object):
 
             _commit = filtered[0].hash
 
-        table_commit_update = read_rows(db, f'''
+        table_commit_update = read_rows_sql(db, f'''
             select 
                 count(*) as count 
             from 
@@ -383,7 +392,7 @@ class DoltDTBase(object):
         if table_commit_update[0]['count'] == 0:
             raise ValueError(f'The table {table} was not updated at commit {_commit}')
 
-        commit_data = read_rows(db, '''
+        commit_data = read_rows_sql(db, '''
             select 
                 commit_hash, 
                 message 
@@ -449,11 +458,14 @@ def DoltDT(
         raise ValueError("Specify audit or config mode, not both.")
     elif audit:
         return DoltAuditDT(audit=audit, run=run)
-    elif run:
-        run = Run(run) if type(run) == str else run
-        if hasattr(run, "data") and hasattr(run.data, "dolt"):
-            return DoltAuditDT(audit=run.data.dolt, run=run)
+    elif run and not config:
+        _run = Run(run) if type(run) == str else run
+        if hasattr(_run, "data") and hasattr(_run.data, "dolt"):
+            return DoltAuditDT(audit=_run.data.dolt, run=_run)
+        else:
+            raise ValueError(f'Run path {run} passed, but associated run does not have data and dolt attributes')
     elif config:
-        return DoltBranchDT(run, config)
+        _run = Run(run) if type(run) == str else run
+        return DoltBranchDT(_run, config)
     else:
         raise ValueError("Specify one of: audit, config")

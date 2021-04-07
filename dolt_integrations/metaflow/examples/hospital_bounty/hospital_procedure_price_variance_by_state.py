@@ -31,6 +31,7 @@ class HospitalProcedurePriceVarianceByState(FlowSpec):
         with DoltDT(run=self.historical_run_path or self, config=analysis_conf) as dolt:
             median_price_by_state = dolt.read("state_procedure_medians")
             variance_by_procedure = median_price_by_state.groupby("code").var()
+            clean = median_price_by_state[median_price_by_state['code'].str.startswith('nan')]
             dolt.write(variance_by_procedure, "variance_by_procedure")
 
         self.next(self.end)

@@ -46,8 +46,10 @@ class HospitalPriceStateMedians(FlowSpec):
         prices_by_state = prices.join(hospitals, how='left', on='npi_number')
         median_price_by_state = prices_by_state.groupby(['state', 'code']).median().reset_index()
 
-        print("writing medians to Dolt")
-        write_conf = DoltConfig(database=self.hospital_price_analysis_db)
+        write_conf = DoltConfig(
+            database=self.hospital_price_analysis_db,
+            branch=self.hospital_price_analysis_db_branch
+        )
         with DoltDT(run=self, config=write_conf) as dolt:
             dolt.write(
                 median_price_by_state,
