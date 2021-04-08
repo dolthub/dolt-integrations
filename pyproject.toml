@@ -7,11 +7,11 @@ authors = ["Max Hoffman <max@dolthub.com>", "Oscar Batori <oscar@dolthub.com>"]
 [tool.poetry.dependencies]
 python = ">=3.6.1,<4.0"
 doltcli = "^0.1.4"
-pandas = { version = ">=0.25.2", optional = true }
+pandas = ">=0.25.2"
 metaflow = { version = "^2.2.6", optional = true }
 
 [tool.poetry.extras]
-metaflow = ["metaflow", "pandas"]
+metaflow = ["metaflow"]
 
 [tool.poetry.dev-dependencies]
 black = "^20.8b1"
