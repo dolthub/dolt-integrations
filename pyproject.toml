@@ -17,11 +17,7 @@ metaflow = ["metaflow", "pandas"]
 black = "^20.8b1"
 pytest = "^6.2.2"
 mypy = "^0.800"
-ipython = "^7.19.0"
 pytest-cov = "^2.11.1"
-chartify = "^3.0.3"
-altair = "^4.1.0"
-altair_saver = "^0.5.0"
 metaflow = "^2.2.6"
 
 [build-system]
