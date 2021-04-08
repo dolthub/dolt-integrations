@@ -33,7 +33,7 @@ jobs:
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       - name: Update Dolt-integrations version
         run: |
-          sed -i 's/version = .*/version = "'"$VERSION"'"/' "$FILE"
+          sed -i 's/^version = .*/^version = "'"$VERSION"'"/' "$FILE"
         env:
           FILE: pyproject.toml
           VERSION: ${{ github.event.inputs.version }}

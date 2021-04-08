@@ -7,8 +7,8 @@ authors = ["Max Hoffman <max@dolthub.com>", "Oscar Batori <oscar@dolthub.com>"]
 [tool.poetry.dependencies]
 python = ">=3.6.1,<4.0"
 doltcli = "^0.1.4"
-pandas = { version = "0.1.0"
-metaflow = { version = "0.1.0"
+pandas = { version = ">=0.25.2", optional = true }
+metaflow = { version = "^2.2.6", optional = true }
 
 [tool.poetry.extras]
 metaflow = ["metaflow", "pandas"]
