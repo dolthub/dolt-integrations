@@ -1,22 +1,23 @@
-from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from functools import wraps
 import hashlib
 import json
-import os
+import logging
 import time
 from typing import Dict, List, Optional, Union
 import uuid
+import os
 
+from dolt_integrations.utils import read_pandas_sql, write_pandas
 import pandas as pd
 
-from doltpy.cli import Dolt
-from doltpy.cli.write import write_pandas
-from doltpy.cli.dolt import DoltException
-from doltpy.cli.read import read_pandas_sql
-from metaflow import FlowSpec, Run, current
+from doltcli import Dolt, DoltException
+from doltcli import read_rows_sql
+from metaflow import FlowSpec, Run
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 DOLT_METAFLOW_ACTIONS = "metaflow_actions"
 
 
@@ -57,7 +58,7 @@ class DoltAction:
 
     pathspec: str
     table_name: str = None
-    commit: str = None
+    commit: str = Optional[None]
     kind: str = "read"
     query: str = None
     artifact_name: str = None
@@ -92,6 +93,7 @@ class DoltConfig:
     commit: str = None
     dolthub_remote: bool = False
     push_on_commit: bool = False
+
     # dolt_fqn: str
 
     def dict(self):
@@ -126,17 +128,24 @@ class DoltAudit(object):
         return cls(**json.loads(data))
 
 
-def runtime_only(f):
-    @wraps(f)
-    def inner(*args, **kwargs):
-        from metaflow import current
+def runtime_only(error: bool = True):
+    def outer(f):
+        @wraps(f)
+        def inner(*args, **kwargs):
+            from metaflow import current
 
-        if not current.is_running_flow:
-            raise ValueError(f"Action only permitted during running flow: {repr(f)}")
+            if current.is_running_flow:
+                return f(*args, **kwargs)
 
-        return f(*args, **kwargs)
+            msg = f"Action only permitted during running flow: {repr(f)}"
+            if error:
+                raise ValueError(msg)
+            else:
+                logger.warning(msg)
 
-    return inner
+        return inner
+
+    return outer
 
 
 def audit_unsafe(f):
@@ -192,7 +201,7 @@ class DoltDTBase(object):
             self._update_dolt_artifact()
         return
 
-    @runtime_only
+    @runtime_only()
     def _reverse_object_action_marks(self):
         new_attributes = set(vars(self._run).keys()) - self._start_run_attributes
         for a in new_attributes:
@@ -227,14 +236,14 @@ class DoltDTBase(object):
         )
         return self._execute_read_action(action, self._config)
 
-    @runtime_only
+    @runtime_only()
     @audit_unsafe
     def write(
-        self,
-        df: pd.DataFrame,
-        table_name: str,
-        pks: List[str] = None,
-        as_key: str = None,
+            self,
+            df: pd.DataFrame,
+            table_name: str,
+            pks: List[str] = None,
+            as_key: str = None,
     ):
         if not pks:
             df = df.reset_index()
@@ -244,7 +253,7 @@ class DoltDTBase(object):
 
         action = DoltAction(
             kind="write",
-            key=table_name or key,
+            key=as_key or table_name,
             commit=None,
             config_id=self._config.id,
             query=f"SELECT * FROM `{table_name}`",
@@ -309,11 +318,11 @@ class DoltDTBase(object):
             h = hash(obj)
         return h
 
-    @runtime_only
+    @runtime_only(error=False)
     def _mark_object(self, obj, action: DoltAction):
         self._dolt_marked[self._hash_object(obj)] = action.key
 
-    @runtime_only
+    @runtime_only()
     @audit_unsafe
     def _commit_actions(self, allow_empty: bool = True):
         if not self._pending_writes:
@@ -347,11 +356,19 @@ class DoltDTBase(object):
         except DoltException as e:
             pass
 
+        if '.dolt' not in os.listdir(config.database):
+            raise ValueError(f'Passed a path {config.database} that is not a Dolt database directory')
+
         doltdb = Dolt(repo_dir=config.database)
-        try:
-            doltdb.checkout(config.branch, checkout_branch=False)
-        except DoltException as e:
+        current_branch, branches = doltdb.branch()
+
+        logger.info(f'Dolt database in {config.database} at branch {current_branch.name}, using branch {config.branch}')
+        if config.branch == current_branch.name:
             pass
+        elif config.branch not in [branch.name for branch in branches]:
+            raise ValueError(f"Passed branch '{config.branch}' that does not exist")
+        else:
+            doltdb.checkout(config.branch, checkout_branch=False)
 
         if not doltdb.status().is_clean:
             raise Exception(
@@ -373,6 +390,43 @@ class DoltDTBase(object):
         from metaflow import current
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
+
+    def get_run(self, table: str, branch: str = 'master', commit: str = None) -> Run:
+        db = self._get_db(self._config)
+
+        if commit:
+            _commit = commit
+        else:
+            _, branches = db.branch()
+            filtered = [b for b in branches if b.name == branch]
+            if len(filtered) == 0:
+                raise ValueError(f'Branch {branch} not in list of branches {[b.name for b in branches]}')
+
+            _commit = filtered[0].hash
+
+        table_commit_update = read_rows_sql(db, f'''
+            select 
+                count(*) as count 
+            from 
+                dolt_history_{table} 
+            where commit_hash = '{_commit}'
+        ''')
+
+        if table_commit_update[0]['count'] == 0:
+            raise ValueError(f'The table {table} was not updated at commit {_commit}')
+
+        commit_data = read_rows_sql(db, '''
+            select 
+                commit_hash, 
+                message 
+            from 
+                dolt_commits 
+            where
+                message like 'Run: %' 
+        ''')
+        commit_to_run_map = {row['commit_hash']: row['message'].lstrip('Run: ') for row in commit_data}
+
+        return commit_to_run_map[_commit]
 
 
 class DoltBranchDT(DoltDTBase):
@@ -400,7 +454,7 @@ class DoltAuditDT(DoltDTBase):
         action.key = as_key or key
         if action.kind != "read":
             action.kind = "read"
-            action.query = (action.query or f"SELECT * FROM `{action.table_name}`",)
+            action.query = action.query or f"SELECT * FROM `{action.table_name}`"
 
         config = self._sconfigs[action.config_id]
         return self._execute_read_action(action, config)
@@ -419,17 +473,18 @@ class DoltAuditDT(DoltDTBase):
 
 
 def DoltDT(
-    run: Optional[FlowSpec] = None,
+    run: Optional[Union[str, FlowSpec]] = None,
     audit: Optional[dict] = None,
     config: Optional[DoltConfig] = None,
 ):
+    _run = Run(run) if type(run) == str else run
     if config and audit:
-        raise ValueError("Specify audit or config mode, not both.")
+        logger.warning("Specified audit or config mode, will use aduit.")
     elif audit:
-        return DoltAuditDT(audit=audit, run=run)
+        return DoltAuditDT(audit=audit, run=_run)
     elif config:
-        return DoltBranchDT(run, config)
-    elif run and hasattr(run, "data") and hasattr(run.data, "dolt"):
-        return DoltAuditDT(audit=run.data.dolt, run=run)
+        return DoltBranchDT(_run, config)
+    elif _run and hasattr(_run, "data") and hasattr(_run.data, "dolt"):
+        return DoltAuditDT(audit=_run.data.dolt, run=_run)
     else:
         raise ValueError("Specify one of: audit, config")

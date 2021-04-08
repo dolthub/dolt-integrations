@@ -7,7 +7,7 @@ logger.setLevel(logging.WARNING)
 import pickle
 
 from metaflow import FlowSpec, step, Parameter
-from doltpy_integrations.metaflow.dolt import DoltConfig, DoltDT
+from dolt_integrations.metaflow.dolt import DoltConfig, DoltDT
 import pandas as pd
 
 
