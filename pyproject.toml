@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dolt_integrations"
-^version = "0.1.0"
+version = "0.1.0"
 description = ""
 authors = ["Max Hoffman <max@dolthub.com>", "Oscar Batori <oscar@dolthub.com>"]
 
