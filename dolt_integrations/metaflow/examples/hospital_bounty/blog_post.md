@@ -1,15 +1,21 @@
+
 ---
 title: Introducing Dolt + Metaflow
 ---
 
 ## Background
-This post details how to use Metaflow with Dolt. [Metaflow](https://metaflow.org/) is a workflow manager that offers data scientists the ability to define local experiments and scale those experiments to production jobs from a single API. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features. Each commit corresponds to the state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
+This post details how to use Metaflow with Dolt. [Metaflow](https://metaflow.org/) is a framework for defining data science and data engineering workflows with the the ability to define local experiments and scale those experiments to production jobs from a single API. [Dolt](https://docs.dolthub.com/) is a version controlled relational database. It provides a familiar SQL interface along with Git-like version control features. Each commit corresponds to the state of the database at the time the commit was created. Both Dolt and Metaflow are open source.
 
-To illustrate the power of integrating Metaflow and Dolt, we use an example Metaflow pipeline to derive results data from an input dataset. We read the input data into a Pandas DataFrame and convert that DataFrame to permanent storage in Dolt for use with application layer services with an intermediate step. Dolt SQL Server can be used to serve this versioned and reproducible data over MySQL connectors:
+Specifically we show how the= combination of Dolt and Metaflow can be used to address three common challenges in modern data science projects:
+- *Reproducibility*: how to make sure that we can repeat past results consistently and improve results incrementally. Disciplined science and engineering requires that goalposts don’t shift unexpectedly, for example due to changes in input data.
+- *Experiment tracking* - how to keep track of all changes and experiments executed. Today, it is hard to imagine software development without a version control like Git - data science needs a similar tool to stay organized.
+- *Lineage and auditing* - finally, when our system is in production, we want to understand the exact model and input data that contribute to the system’s output, for example predictions. This is especially important when results are surprising and we need to understand why.
+
+Both Dolt and Metaflow are built around the idea of strong versioning: Dolt versions data and Metaflow versions code, execution environments, and the state of execution. To illustrate how Metaflow and Dolt work together to solve for these challenges, we use an example Metaflow pipeline to derive results data from an input dataset. We read the input data into a Pandas DataFrame and convert that DataFrame to permanent storage in Dolt for use with application layer services with an intermediate step. Dolt SQL Server can be used to serve this versioned and reproducible data over MySQL connectors:
 
 ![Data Architecture](dolt-metaflow-integration-data-architecture.png)
 
-This blog post will breakdown how to use Dolt to augment Metaflow based pipelines with full reproducibility, lineage, and back-testing capabilities for tabular data. Dolt allows users to see where their data came from, what it looked like at every transformation, and to feed historical versions of it into subsequent flow runs.
+Let's dive into the details of our example pipeline.
 
 ## Example Pipeline
 Our pipeline consists of two flows. One flow consumes the results written by the other. The first flow computes the state level median price for a hospital procedure. The second flow computes the variance of the price for a procedure across states. For input data we chose a new public [dataset](https://www.dolthub.com/repositories/dolthub/hospital-price-transparency) of 1400 US hospital prices created using DoltHub [data bounties](https://www.dolthub.com/bounties). Our pipeline will look something like this:
@@ -37,7 +43,7 @@ This is all abstract, so let's install a few dependencies, grab a dataset, and g
 
 ## Setup
 Let's get the boring stuff out of the way. We need the following:
-- Dolt and `doltpy-integrations` installed
+- Dolt and `dolt-integrations` installed
 - Metaflow installed
 - the sample dataset we will use, which can easily clone from DoltHub
 
@@ -63,18 +69,7 @@ $ dolt clone dolthub/hospital-price-transparency && cd hospital-price-transparen
 
 Note this dataset is nearly 20 gigabytes, and could take a few minutes to clone. Once it's landed it's straightforward to jump right into SQL:
 ```
-$ dolt sql
-# Welcome to the DoltSQL shell.
-# Statements must be terminated with ';'.
-# "exit" or "quit" (or Ctrl-D) to exit.
-hospital_price_transparency> show tables;
-+-----------+
-| Table     |
-+-----------+
-| cpt_hcpcs |
-| hospitals |
-| prices    |
-+-----------+
+
 ```
 
 At the outset we said we were going to store the results in Dolt. To do so we need to create a Dolt database to write to:
@@ -95,10 +90,6 @@ $ poetry run python3 hospital_procedure_price_state_medians.py run \
 Metaflow 2.2.8 executing HospitalPriceStateMedians for user:oscarbatori
 Validating your flow...
     The graph looks good!
-Running pylint...
-    Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
-    Skipping Pylint checks.
 2021-04-07 08:50:36.934 Workflow starting (run-id 1617810636925188):
 2021-04-07 08:50:36.941 [1617810636925188/start/1 (pid 21075)] Task is starting.
 2021-04-07 09:02:36.095 [1617810636925188/start/1 (pid 21075)] Task finished successfully.
@@ -114,10 +105,6 @@ $ poetry run python3 hospital_procedure_price_variance_by_state.py run \
 Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
 Validating your flow...
     The graph looks good!
-Running pylint...
-    Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
-    Skipping Pylint checks.
 2021-04-07 09:07:25.262 Workflow starting (run-id 1617811645255563):
 2021-04-07 09:07:25.269 [1617811645255563/start/1 (pid 21299)] Task is starting.
 2021-04-07 09:08:25.200 [1617811645255563/end/2 (pid 21349)] Task is starting.
@@ -125,7 +112,7 @@ Running pylint...
 2021-04-07 09:08:25.983 Done!
 ```
 
-We now have our first result set computed. Let's access the computed variances via the integration, using the flow as an entry point:
+We now have our first result set computed. Let's access the computed variances via the integration, using the flow as an entry point. You can execute the following snippet, and subsequent examples, using the Python interpreter on the command line or in a notebook. The snippet uses [Metaflow’s Client API](https://docs.metaflow.org/metaflow/client) to access results of past runs:
 ```python
 from metaflow import Flow
 from dolt_integrations.metaflow import DoltDT
@@ -202,10 +189,6 @@ $ poetry run python3 hospital_procedure_price_state_medians.py run \
 Metaflow 2.2.8 executing HospitalPriceStateMedians for user:oscarbatori
 Validating your flow...
     The graph looks good!
-Running pylint...
-    Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
-    Skipping Pylint checks.
 2021-04-07 09:20:00.883 Workflow starting (run-id 1617812400875290):
 2021-04-07 09:20:00.889 [1617812400875290/start/1 (pid 21700)] Task is starting.
 2021-04-07 09:20:20.254 [1617812400875290/start/1 (pid 21700)] Task finished successfully.
@@ -222,10 +205,6 @@ $ poetry run python3 hospital_procedure_price_variance_by_state.py run \
 Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
 Validating your flow...
     The graph looks good!
-Running pylint...
-    Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded while calling a Python object')
-    Skipping Pylint checks.
 2021-04-07 09:21:12.296 Workflow starting (run-id 1617812472287058):
 2021-04-07 09:21:12.303 [1617812472287058/start/1 (pid 21827)] Task is starting.
 2021-04-07 09:21:16.321 [1617812472287058/end/2 (pid 21871)] Task is starting.
@@ -352,10 +331,6 @@ $ poetry run python3 hospital_procedure_price_variance_by_state.py run \
 Metaflow 2.2.8 executing HospitalProcedurePriceVarianceByState for user:oscarbatori
 Validating your flow...
     The graph looks good!
-Running pylint...
-    Pylint couldn't analyze your code.
-    	Pylint exception: RecursionError('maximum recursion depth exceeded')
-    Skipping Pylint checks.
 2021-04-07 15:11:15.634 Workflow starting (run-id 1617833475626845):
 2021-04-07 15:11:15.641 [1617833475626845/start/1 (pid 42039)] Task is starting.
 2021-04-07 15:12:17.799 [1617833475626845/start/1 (pid 42039)] Task finished successfully.
