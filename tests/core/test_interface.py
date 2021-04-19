@@ -7,7 +7,7 @@ from dolt_integrations.core.interface import *
 
 def write_dict_to_csv(data, file):
     csv_columns = list(data[0].keys())
-    with open(file, 'w') as csvfile:
+    with open(file, "w") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
         writer.writeheader()
         for row in data:
@@ -15,7 +15,7 @@ def write_dict_to_csv(data, file):
 
 
 def read_csv_to_dict(file):
-    with open(file, 'r') as csvfile:
+    with open(file, "r") as csvfile:
         reader = csv.DictReader(csvfile)
         return list(reader)
 
@@ -25,7 +25,7 @@ def test_export_csv(doltdb, tmpfile):
     res = read_csv_to_dict(tmpfile)
     assert len(res) == 5
     assert set(res[0].keys()) == {"a", "b"}
-    assert res[0]["a"] == '0'
+    assert res[0]["a"] == "0"
 
 
 def test_import_csv(doltdb, tmpfile):
@@ -36,23 +36,47 @@ def test_import_csv(doltdb, tmpfile):
         dict(c=3, d=3),
     ]
     write_dict_to_csv(cmp, tmpfile)
-    dolt_import_csv(db=doltdb, tablename="bar", filename=tmpfile, save_args=dict(primary_key="c"))
+    dolt_import_csv(
+        db=doltdb, tablename="bar", filename=tmpfile, save_args=dict(primary_key="c")
+    )
     res = doltdb.sql("select * from bar", result_format="csv")
     for r1, r2 in zip(cmp, res):
         assert r1["c"] == int(r2["c"])
 
+
 def test_action_default():
-    action = action_meta("t", "f", "fc", "tc", "br", "save", meta_conf=CallbackMeta(fn=lambda x: x))
+    action = action_meta(
+        "t", "f", "fc", "tc", "br", "save", meta_conf=CallbackMeta(fn=lambda x: x)
+    )
     assert action["filename"] == "f"
 
+
 def test_action_callback():
-    action = action_meta("t", "f", "fc", "tc", "br", "save", meta_conf=CallbackMeta(fn=lambda x: x["filename"]))
+    action = action_meta(
+        "t",
+        "f",
+        "fc",
+        "tc",
+        "br",
+        "save",
+        meta_conf=CallbackMeta(fn=lambda x: x["filename"]),
+    )
     assert action == "f"
 
+
 def test_action_dolt(doltdb):
-    action = action_meta("t", "f", "fc", "tc", "br", "save", meta_conf=DoltMeta(db=doltdb, tablename="meta"))
+    action = action_meta(
+        "t",
+        "f",
+        "fc",
+        "tc",
+        "br",
+        "save",
+        meta_conf=DoltMeta(db=doltdb, tablename="meta"),
+    )
     res = doltdb.sql("select * from meta", result_format="csv")
     assert len(res) > 0
+
 
 def test_branch_serial(doltdb):
     starting_head = doltdb.head
@@ -65,11 +89,13 @@ def test_branch_serial(doltdb):
     assert doltdb.active_branch == "master"
     assert doltdb.head == starting_head
 
+
 @pytest.mark.skip
 def test_branch_detach_cm(doltdb):
     branch_conf = ParallelBranch(branch_from="new")
     with branch_conf(doltdb) as db:
         assert db.active_branch == "new"
+
 
 def test_load(doltdb, tmpfile):
     res = load(
@@ -88,7 +114,8 @@ def test_load(doltdb, tmpfile):
     res = read_csv_to_dict(tmpfile)
     assert len(res) == 9
     assert set(res[0].keys()) == {"a", "b"}
-    assert res[0]["a"] == '0'
+    assert res[0]["a"] == "0"
+
 
 def test_save(doltdb, tmpfile):
     cmp = [

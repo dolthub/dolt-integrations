@@ -7,6 +7,7 @@ import typing
 
 import doltcli as dolt
 
+
 @dataclass
 class BranchBase:
     @contextmanager
@@ -20,15 +21,17 @@ class BranchBase:
         finally:
             self.merge(db, starting_active)
 
+
 class ParallelBranch(BranchBase):
-    branch_from: str # existing commit or branch
-    merge_to: str #optional
+    branch_from: str  # existing commit or branch
+    merge_to: str  # optional
 
     def checkout(self, db: dolt.Dolt):
         pass
 
     def merge(self, db: dolt.Dolt, starting_branch: str):
         pass
+
 
 @dataclass
 class SerialBranch(BranchBase):
@@ -55,7 +58,9 @@ class Action:
     branch: str
     tablename: str
     filename: str
-    timestamp: datetime.datetime = field(default_factory=lambda: datetime.datetime.now())
+    timestamp: datetime.datetime = field(
+        default_factory=lambda: datetime.datetime.now()
+    )
     context_id: str = None
     kind: str = "load"
     meta: dict = None
@@ -66,21 +71,24 @@ class Action:
     def json(self):
         return json.dumps(self.dict(), cls=Encoder)
 
+
 class Meta:
     def create(self, action: Action):
         return action.dict()
+
 
 @dataclass
 class DoltMeta(Meta):
     db: dolt.Dolt
     tablename: str
     branch_config: dict = None
+
     def create(self, a: Action):
         branch_config = self.branch_config or SerialBranch(branch=self.db.active_branch)
         with branch_config(self.db):
             tables = self.db.sql(
                 f"select * from information_schema.tables where table_name = '{self.tablename}'",
-                result_format="json"
+                result_format="json",
             )
 
             if len(tables["rows"]) < 1:
@@ -109,14 +117,25 @@ class DoltMeta(Meta):
             )
         return a.dict()
 
+
 @dataclass
 class CallbackMeta:
     fn: typing.Callable
+
     def create(self, action: Action):
         return self.fn(action.dict())
 
-def action_meta(tablename: str, filename: str, from_commit: str, to_commit: str, branch: str, kind: str, context_id: str = None, meta_conf: Meta =
-                None):
+
+def action_meta(
+    tablename: str,
+    filename: str,
+    from_commit: str,
+    to_commit: str,
+    branch: str,
+    kind: str,
+    context_id: str = None,
+    meta_conf: Meta = None,
+):
     action = Action(
         tablename=tablename,
         filename=filename,
@@ -147,12 +166,16 @@ class Remote:
         pass
 
 
-def dolt_export_csv(db: dolt.Dolt, tablename: str, filename: str, load_args: dict = None):
+def dolt_export_csv(
+    db: dolt.Dolt, tablename: str, filename: str, load_args: dict = None
+):
     exp = ["table", "export", "-f", "--file-type", "csv", tablename, filename]
     db.execute(exp)
 
 
-def dolt_import_csv(db: dolt.Dolt, tablename: str, filename: str, save_args: dict = None):
+def dolt_import_csv(
+    db: dolt.Dolt, tablename: str, filename: str, save_args: dict = None
+):
     mode = "-c"
     tables = db.ls()
     for t in tables:
@@ -169,7 +192,15 @@ def dolt_import_csv(db: dolt.Dolt, tablename: str, filename: str, save_args: dic
     db.execute(imp)
 
 
-def load(db: dolt.Dolt, tablename: str, filename: str, load_args: dict = None, meta_conf: dict = None, remote_conf: dict = None, branch_conf: dict = None):
+def load(
+    db: dolt.Dolt,
+    tablename: str,
+    filename: str,
+    load_args: dict = None,
+    meta_conf: dict = None,
+    remote_conf: dict = None,
+    branch_conf: dict = None,
+):
     """
     db remote pattern with context
     db checkout pattern with branch context
@@ -180,7 +211,9 @@ def load(db: dolt.Dolt, tablename: str, filename: str, load_args: dict = None, m
         remote_conf.pull(db)
 
     with branch_conf(db) as chk_db:
-        dolt_export_csv(db=db, tablename=tablename, filename=filename, load_args=load_args)
+        dolt_export_csv(
+            db=db, tablename=tablename, filename=filename, load_args=load_args
+        )
 
         commit = chk_db.head
         branch = chk_db.active_branch
@@ -201,7 +234,15 @@ def load(db: dolt.Dolt, tablename: str, filename: str, load_args: dict = None, m
     return meta
 
 
-def save(db: dolt.Dolt, tablename, filename: str, save_args: dict = None, meta_conf: dict = None, remote_conf: dict = None, branch_conf: dict = None):
+def save(
+    db: dolt.Dolt,
+    tablename,
+    filename: str,
+    save_args: dict = None,
+    meta_conf: dict = None,
+    remote_conf: dict = None,
+    branch_conf: dict = None,
+):
     """
     pull remote
     checkout branch
@@ -217,7 +258,9 @@ def save(db: dolt.Dolt, tablename, filename: str, save_args: dict = None, meta_c
     with branch_conf(db) as chk_db:
         from_commit = chk_db.head
 
-        dolt_import_csv(db=db, tablename=tablename, filename=filename, save_args=save_args)
+        dolt_import_csv(
+            db=db, tablename=tablename, filename=filename, save_args=save_args
+        )
 
         chk_db.sql(f"select dolt_add('{tablename}')")
         status = chk_db.sql("select * from dolt_status", result_format="csv")
@@ -241,4 +284,3 @@ def save(db: dolt.Dolt, tablename, filename: str, save_args: dict = None, meta_c
         remote_conf.push(db)
 
     return meta
-

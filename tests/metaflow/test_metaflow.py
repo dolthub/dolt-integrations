@@ -6,6 +6,7 @@ import pytest
 from dolt_integrations.metaflow import DoltDT, detach_head
 from dolt_integrations.utils import read_pandas_sql
 
+
 def test_branchdt_cm_init(active_run, dolt_config):
     with DoltDT(run=active_run, config=dolt_config) as dolt:
         pass
@@ -163,6 +164,7 @@ def test_auditdt_cm_diff(active_run, dolt_audit1, doltdb):
     with DoltDT(run=active_run, audit=dolt_audit1) as dolt:
         df = dolt.sql("SELECT * FROM `bar`", as_key="akey")
         diff = dolt.diff(from_commit=logs[1], to_commit=logs[0], table="bar")
+
 
 def test_detach_head(doltdb):
     db = Dolt(doltdb)

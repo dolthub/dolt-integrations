@@ -4,6 +4,7 @@ import tempfile
 import doltcli as dolt
 import pytest
 
+
 @pytest.fixture(scope="function")
 def doltdb(tmpdir):
     db = dolt.Dolt.init(tmpdir)
@@ -15,6 +16,7 @@ def doltdb(tmpdir):
     db.sql("select dolt_commit('-am', 'Add rows to new branch')")
     db.checkout(branch="master")
     return db
+
 
 @pytest.fixture(scope="function")
 def tmpfile(tmp_path):
