@@ -32,13 +32,13 @@ def detach_head(db, commit):
         )
         if len(commit_branches) > 0:
             tmp_branch = commit_branches[0]
-            if active_branch.commit_id != tmp_branch["hash"]:
+            if active_branch.hash != tmp_branch["hash"]:
                 swtiched = True
                 db.checkout(tmp_branch["name"])
             yield db
         else:
             tmp_branch = f"detached_HEAD_at_{commit[:5]}"
-            db.checkout(branch=commit, start_point=tmp_branch, checkout_branch=True)
+            db.checkout(branch=tmp_branch, start_point=commit, checkout_branch=True)
             switched = True
             yield db
     finally:
@@ -298,7 +298,7 @@ class DoltDTBase(object):
         finally:
             db.sql(query=f"set `@@{db.repo_name}_head` = '{starting_commit}'")
 
-    @runtime_only
+    @runtime_only(error=False)
     def _add_action(self, action: DoltAction):
         if action.key in self._new_actions:
             raise ValueError("Duplicate key attempted to override dolt state")
