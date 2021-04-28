@@ -6,8 +6,9 @@ authors = ["Max Hoffman <max@dolthub.com>", "Oscar Batori <oscar@dolthub.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.6.1,<4.0"
-doltcli = "^0.1.4"
 pandas = ">=0.25.2"
+dataclasses_json = "^0.5.3"
+doltcli = "^0.1.6"
 metaflow = { version = "^2.2.6", optional = true }
 
 [tool.poetry.extras]

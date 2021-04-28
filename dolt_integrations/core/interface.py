@@ -1,15 +1,15 @@
 from contextlib import contextmanager
 import datetime
+from dataclasses_json import dataclass_json
 from dataclasses import asdict, dataclass, field
 import json
 
-import typing
+from typing import Callable, Optional
 
-import doltcli as dolt
+import doltcli as dolt # typing: ignore
 
 
-@dataclass
-class BranchBase:
+class Branch:
     @contextmanager
     def __call__(self, db: dolt.Dolt):
         starting_head = db.head
@@ -21,8 +21,16 @@ class BranchBase:
         finally:
             self.merge(db, starting_active)
 
+    def checkout(self, db: dolt.Dolt):
+        raise NotImplemented
 
-class ParallelBranch(BranchBase):
+    def merge(self, db: dolt.Dolt, starting_branch: str):
+        raise NotImplemented
+
+
+@dataclass_json
+@dataclass
+class MergeBranch(Branch):
     branch_from: str  # existing commit or branch
     merge_to: str  # optional
 
@@ -33,9 +41,10 @@ class ParallelBranch(BranchBase):
         pass
 
 
+@dataclass_json
 @dataclass
-class SerialBranch(BranchBase):
-    branch: str
+class SerialBranch(Branch):
+    branch: str = "master"
 
     def checkout(self, db: dolt.Dolt):
         # branch must exist
@@ -45,43 +54,34 @@ class SerialBranch(BranchBase):
         db.checkout(starting_branch, error=False)
 
 
-class Encoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return str(obj)
-
-
+@dataclass_json
 @dataclass
 class Action:
     from_commit: str
     to_commit: str
     branch: str
-    tablename: str
     filename: str
     timestamp: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now()
     )
-    context_id: str = None
-    kind: str = "load"
-    meta: dict = None
-
-    def dict(self):
-        return asdict(self)
-
-    def json(self):
-        return json.dumps(self.dict(), cls=Encoder)
+    context_id: Optional[str] = None
+    tablename: Optional[str] = None
+    sql: Optional[str] = None
+    kind: Optional[str] = "load"
+    meta: Optional[dict] = None
 
 
 class Meta:
     def create(self, action: Action):
-        return action.dict()
+        return action.to_dict()
 
 
+@dataclass_json
 @dataclass
 class DoltMeta(Meta):
     db: dolt.Dolt
     tablename: str
-    branch_config: dict = None
+    branch_config: Optional[Branch] = None
 
     def create(self, a: Action):
         branch_config = self.branch_config or SerialBranch(branch=self.db.active_branch)
@@ -115,29 +115,32 @@ class DoltMeta(Meta):
                     """,
                 result_format="csv",
             )
-        return a.dict()
+        return a.to_dict()
 
 
+@dataclass_json
 @dataclass
 class CallbackMeta:
-    fn: typing.Callable
+    fn: Callable
 
     def create(self, action: Action):
-        return self.fn(action.dict())
+        return self.fn(action.to_dict())
 
 
 def action_meta(
-    tablename: str,
     filename: str,
     from_commit: str,
     to_commit: str,
     branch: str,
     kind: str,
+    tablename: str = None,
+    sql: str = None,
     context_id: str = None,
     meta_conf: Meta = None,
 ):
     action = Action(
         tablename=tablename,
+        sql=sql,
         filename=filename,
         from_commit=from_commit,
         to_commit=to_commit,
@@ -155,9 +158,9 @@ def action_meta(
 
 @dataclass
 class Remote:
-    name: str = None
-    url: str = None
-    force: bool = False
+    name: Optional[str] = None
+    url: Optional[str] = None
+    force: Optional[bool] = False
 
     def pull(self, db: dolt.Dolt):
         pass
@@ -173,6 +176,15 @@ def dolt_export_csv(
     db.execute(exp)
 
 
+def dolt_sql_to_csv(
+    db: dolt.Dolt, sql: str, filename: str, load_args: dict = None
+):
+    if load_args is None:
+        load_args = {}
+    db.sql(query=sql, result_file=filename, result_format="csv", **load_args)
+    return
+
+
 def dolt_import_csv(
     db: dolt.Dolt, tablename: str, filename: str, save_args: dict = None
 ):
@@ -183,8 +195,10 @@ def dolt_import_csv(
             mode = "-u"
             break
 
-    imp = ["table", "import", mode, tablename]
-    if "primary_key" in save_args:
+    filetype = "--file-type csv"
+
+    imp = ["table", "import", filetype, mode, tablename]
+    if save_args and "primary_key" in save_args:
         pks = ",".join(save_args["primary_key"])
         imp.append(f"--pk {pks}")
 
@@ -194,12 +208,13 @@ def dolt_import_csv(
 
 def load(
     db: dolt.Dolt,
-    tablename: str,
     filename: str,
-    load_args: dict = None,
-    meta_conf: dict = None,
-    remote_conf: dict = None,
-    branch_conf: dict = None,
+    tablename: Optional[str] = None,
+    sql: Optional[str] = None,
+    load_args: Optional[dict] = None,
+    meta_conf: Optional[Meta]= None,
+    remote_conf: Optional[Remote] = None,
+    branch_conf: Optional[Branch] = None,
 ):
     """
     db remote pattern with context
@@ -207,19 +222,29 @@ def load(
     load data into csv, return filepath
     metadata context needs current branch
     """
+    if tablename is not None and sql is not None:
+        raise ValueError("Specify one of: tablename, qury")
+
     if remote_conf is not None:
         remote_conf.pull(db)
 
+    if branch_conf is None:
+        branch_conf = SerialBranch()
+
     with branch_conf(db) as chk_db:
-        dolt_export_csv(
-            db=db, tablename=tablename, filename=filename, load_args=load_args
-        )
+        if tablename is not None:
+            dolt_export_csv(
+                db=db, tablename=tablename, filename=filename, load_args=load_args
+            )
+        elif sql is not None:
+            dolt_sql_to_csv(db=db, sql=sql, filename=filename, load_args=load_args)
 
         commit = chk_db.head
         branch = chk_db.active_branch
 
     meta = action_meta(
         tablename=tablename,
+        sql=sql,
         filename=filename,
         from_commit=commit,
         to_commit=commit,
@@ -239,9 +264,9 @@ def save(
     tablename,
     filename: str,
     save_args: dict = None,
-    meta_conf: dict = None,
-    remote_conf: dict = None,
-    branch_conf: dict = None,
+    meta_conf: Optional[Meta]= None,
+    remote_conf: Optional[Remote] = None,
+    branch_conf: Optional[Branch] = None,
 ):
     """
     pull remote
@@ -255,6 +280,9 @@ def save(
     if remote_conf is not None:
         remote_conf.pull(db)
 
+    if branch_conf is None:
+        branch_conf = SerialBranch()
+
     with branch_conf(db) as chk_db:
         from_commit = chk_db.head
 
@@ -262,7 +290,7 @@ def save(
             db=db, tablename=tablename, filename=filename, save_args=save_args
         )
 
-        chk_db.sql(f"select dolt_add('{tablename}')")
+        chk_db.sql(f"select dolt_add('.')")
         status = chk_db.sql("select * from dolt_status", result_format="csv")
         if len(status) > 0:
             chk_db.sql("select dolt_commit('-m', 'Automated commit')")

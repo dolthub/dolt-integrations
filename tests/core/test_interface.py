@@ -20,8 +20,16 @@ def read_csv_to_dict(file):
         return list(reader)
 
 
-def test_export_csv(doltdb, tmpfile):
+def test_export_table_csv(doltdb, tmpfile):
     dolt_export_csv(db=doltdb, tablename="foo", filename=tmpfile)
+    res = read_csv_to_dict(tmpfile)
+    assert len(res) == 5
+    assert set(res[0].keys()) == {"a", "b"}
+    assert res[0]["a"] == "0"
+
+
+def test_export_tablename_csv(doltdb, tmpfile):
+    dolt_sql_to_csv(db=doltdb, sql="select * from foo", filename=tmpfile)
     res = read_csv_to_dict(tmpfile)
     assert len(res) == 5
     assert set(res[0].keys()) == {"a", "b"}
@@ -46,19 +54,25 @@ def test_import_csv(doltdb, tmpfile):
 
 def test_action_default():
     action = action_meta(
-        "t", "f", "fc", "tc", "br", "save", meta_conf=CallbackMeta(fn=lambda x: x)
+        tablename="t",
+        filename="f",
+        from_commit="fc",
+        to_commit="tc",
+        branch="br",
+        kind="save",
+        meta_conf=CallbackMeta(fn=lambda x: x)
     )
     assert action["filename"] == "f"
 
 
 def test_action_callback():
     action = action_meta(
-        "t",
-        "f",
-        "fc",
-        "tc",
-        "br",
-        "save",
+        tablename="t",
+        filename="f",
+        from_commit="fc",
+        to_commit="tc",
+        branch="br",
+        kind="save",
         meta_conf=CallbackMeta(fn=lambda x: x["filename"]),
     )
     assert action == "f"
@@ -66,12 +80,12 @@ def test_action_callback():
 
 def test_action_dolt(doltdb):
     action = action_meta(
-        "t",
-        "f",
-        "fc",
-        "tc",
-        "br",
-        "save",
+        tablename="t",
+        filename="f",
+        from_commit="fc",
+        to_commit="tc",
+        branch="br",
+        kind="save",
         meta_conf=DoltMeta(db=doltdb, tablename="meta"),
     )
     res = doltdb.sql("select * from meta", result_format="csv")
@@ -92,12 +106,12 @@ def test_branch_serial(doltdb):
 
 @pytest.mark.skip
 def test_branch_detach_cm(doltdb):
-    branch_conf = ParallelBranch(branch_from="new")
+    branch_conf = MergeBranch(branch_from="new")
     with branch_conf(doltdb) as db:
         assert db.active_branch == "new"
 
 
-def test_load(doltdb, tmpfile):
+def test_load_table(doltdb, tmpfile):
     res = load(
         db=doltdb,
         tablename="foo",
@@ -115,6 +129,26 @@ def test_load(doltdb, tmpfile):
     assert len(res) == 9
     assert set(res[0].keys()) == {"a", "b"}
     assert res[0]["a"] == "0"
+
+def test_load_sql(doltdb, tmpfile):
+    res = load(
+        db=doltdb,
+        sql="select * from foo",
+        filename=tmpfile,
+        meta_conf=DoltMeta(db=doltdb, tablename="meta"),
+        branch_conf=SerialBranch("new"),
+    )
+    assert doltdb.active_branch == "master"
+
+    meta_res = doltdb.sql("select * from meta", result_format="csv")
+    assert len(meta_res) == 1
+    assert meta_res[0]["branch"] == "new"
+
+    res = read_csv_to_dict(tmpfile)
+    assert len(res) == 9
+    assert set(res[0].keys()) == {"a", "b"}
+    assert res[0]["a"] == "0"
+
 
 
 def test_save(doltdb, tmpfile):
