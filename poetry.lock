@@ -578,7 +578,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 metaflow = ["metaflow"]
 
 [metadata]
-content-hash = "52e7a0a04454b12248f38f588a62f1931f055207d27e996f9209ed1b1e6ef89e"
+content-hash = "2ffe5939eae49f29ecf9071f5de7990f89f27fb66439229a9d66b712c93ae9c5"
 lock-version = "1.1"
 python-versions = ">=3.6.1,<4.0"
 
