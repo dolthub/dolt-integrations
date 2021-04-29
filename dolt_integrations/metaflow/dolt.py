@@ -239,11 +239,11 @@ class DoltDTBase(object):
     @runtime_only()
     @audit_unsafe
     def write(
-            self,
-            df: pd.DataFrame,
-            table_name: str,
-            pks: List[str] = None,
-            as_key: str = None,
+        self,
+        df: pd.DataFrame,
+        table_name: str,
+        pks: List[str] = None,
+        as_key: str = None,
     ):
         if not pks:
             df = df.reset_index()
@@ -356,13 +356,17 @@ class DoltDTBase(object):
         except DoltException as e:
             pass
 
-        if '.dolt' not in os.listdir(config.database):
-            raise ValueError(f'Passed a path {config.database} that is not a Dolt database directory')
+        if ".dolt" not in os.listdir(config.database):
+            raise ValueError(
+                f"Passed a path {config.database} that is not a Dolt database directory"
+            )
 
         doltdb = Dolt(repo_dir=config.database)
         current_branch, branches = doltdb.branch()
 
-        logger.info(f'Dolt database in {config.database} at branch {current_branch.name}, using branch {config.branch}')
+        logger.info(
+            f"Dolt database in {config.database} at branch {current_branch.name}, using branch {config.branch}"
+        )
         if config.branch == current_branch.name:
             pass
         elif config.branch not in [branch.name for branch in branches]:
@@ -391,7 +395,7 @@ class DoltDTBase(object):
 
         return f"{current.flow_name}/{current.run_id}/{current.step_name}/{current.task_id}"
 
-    def get_run(self, table: str, branch: str = 'master', commit: str = None) -> Run:
+    def get_run(self, table: str, branch: str = "master", commit: str = None) -> Run:
         db = self._get_db(self._config)
 
         if commit:
@@ -400,22 +404,29 @@ class DoltDTBase(object):
             _, branches = db.branch()
             filtered = [b for b in branches if b.name == branch]
             if len(filtered) == 0:
-                raise ValueError(f'Branch {branch} not in list of branches {[b.name for b in branches]}')
+                raise ValueError(
+                    f"Branch {branch} not in list of branches {[b.name for b in branches]}"
+                )
 
             _commit = filtered[0].hash
 
-        table_commit_update = read_rows_sql(db, f'''
+        table_commit_update = read_rows_sql(
+            db,
+            f"""
             select 
                 count(*) as count 
             from 
                 dolt_history_{table} 
             where commit_hash = '{_commit}'
-        ''')
+        """,
+        )
 
-        if table_commit_update[0]['count'] == 0:
-            raise ValueError(f'The table {table} was not updated at commit {_commit}')
+        if table_commit_update[0]["count"] == 0:
+            raise ValueError(f"The table {table} was not updated at commit {_commit}")
 
-        commit_data = read_rows_sql(db, '''
+        commit_data = read_rows_sql(
+            db,
+            """
             select 
                 commit_hash, 
                 message 
@@ -423,8 +434,11 @@ class DoltDTBase(object):
                 dolt_commits 
             where
                 message like 'Run: %' 
-        ''')
-        commit_to_run_map = {row['commit_hash']: row['message'].lstrip('Run: ') for row in commit_data}
+        """,
+        )
+        commit_to_run_map = {
+            row["commit_hash"]: row["message"].lstrip("Run: ") for row in commit_data
+        }
 
         return commit_to_run_map[_commit]
 
