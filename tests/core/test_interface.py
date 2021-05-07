@@ -177,6 +177,7 @@ def test_save(doltdb, tmpfile):
     doltdb.checkout("master")
     master_head = doltdb.head
 
+    message = "custom_commit_message"
     save(
         db=doltdb,
         tablename="bar",
@@ -184,6 +185,7 @@ def test_save(doltdb, tmpfile):
         save_args=dict(primary_key="c"),
         meta_conf=DoltMeta(db=doltdb, tablename="meta"),
         branch_conf=SerialBranch("new"),
+        commit_message=message,
     )
 
     meta_res = doltdb.sql("select * from meta", result_format="csv")
@@ -194,6 +196,9 @@ def test_save(doltdb, tmpfile):
 
     doltdb.checkout("new")
     assert doltdb.head != new_head
+
+    res = doltdb.sql(f"select * from dolt_commits where message like '%{message}'", result_format="csv")
+    assert len(res) > 0
 
     res = doltdb.sql("select * from bar", result_format="csv")
     for r1, r2 in zip(cmp, res):

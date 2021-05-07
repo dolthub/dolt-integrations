@@ -64,7 +64,6 @@ class NewBranch(Branch):
     _type: str = "NewBranch"
 
     def checkout(self, db: dolt.Dolt):
-        print(self)
         res = db.sql(f"select * from dolt_branches where name = '{self.branch}'", result_format="csv")
         if len(res) == 0:
             db.sql(f"select dolt_checkout('-b', '{self.branch}')", result_format="csv")
@@ -112,7 +111,7 @@ class DoltMeta(Meta):
                 result_format="csv",
             )
 
-            if len(tables["rows"]) < 1:
+            if len(tables) < 1:
                 create_table = f"""
                     create table {self.tablename} (
                         branch text,
@@ -299,6 +298,7 @@ def save(
     meta_conf: Optional[Meta]= None,
     remote_conf: Optional[Remote] = None,
     branch_conf: Optional[Branch] = None,
+    commit_message: str = "Automated commit",
 ):
     """
     pull remote
@@ -324,7 +324,7 @@ def save(
         chk_db.sql(f"select dolt_add('.')", result_format="csv")
         status = chk_db.sql("select * from dolt_status", result_format="csv")
         if len(status) > 0:
-            chk_db.sql("select dolt_commit('-m', 'Automated commit')", result_format="csv")
+            chk_db.sql(f"select dolt_commit('-m', '{commit_message}')", result_format="csv")
 
         to_commit = chk_db.head
         branch = chk_db.active_branch
