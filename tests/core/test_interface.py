@@ -104,6 +104,18 @@ def test_branch_serial(doltdb):
     assert doltdb.head == starting_head
 
 
+def test_branch_new(doltdb):
+    starting_head = doltdb.head
+    assert doltdb.active_branch == "master"
+
+    branches = ["master", "new", "new2"]
+    for br in branches:
+        branch_conf = NewBranch(branch=br)
+        with branch_conf(doltdb) as db:
+            assert db.active_branch == br
+        assert doltdb.active_branch == "master"
+        assert doltdb.head == starting_head
+
 @pytest.mark.skip
 def test_branch_detach_cm(doltdb):
     branch_conf = MergeBranch(branch_from="new")

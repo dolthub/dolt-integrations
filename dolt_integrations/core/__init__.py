@@ -7,6 +7,7 @@ from .interface import (
     load,
     Meta,
     MergeBranch,
+    NewBranch,
     Remote,
     SerialBranch,
     save,

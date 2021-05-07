@@ -13,13 +13,14 @@ class Branch:
     @contextmanager
     def __call__(self, db: dolt.Dolt):
         starting_head = db.head
-        starting_active = db.active_branch
+        starting_branch = db.active_branch
 
         try:
             self.checkout(db)
             yield db
         finally:
-            self.merge(db, starting_active)
+            self.merge(db, starting_branch)
+            db.checkout(starting_branch, error=False)
 
     def checkout(self, db: dolt.Dolt):
         raise NotImplemented
@@ -32,7 +33,8 @@ class Branch:
 @dataclass
 class MergeBranch(Branch):
     branch_from: str  # existing commit or branch
-    merge_to: str  # optional
+    merge_to: str
+    _type: str = "MergeBranch"
 
     def checkout(self, db: dolt.Dolt):
         pass
@@ -45,13 +47,32 @@ class MergeBranch(Branch):
 @dataclass
 class SerialBranch(Branch):
     branch: str = "master"
+    _type: str = "SerialBranch"
 
     def checkout(self, db: dolt.Dolt):
         # branch must exist
         db.checkout(branch=self.branch, error=False)
 
     def merge(self, db: dolt.Dolt, starting_branch: str):
-        db.checkout(starting_branch, error=False)
+        pass
+
+
+@dataclass_json
+@dataclass
+class NewBranch(Branch):
+    branch: str
+    _type: str = "NewBranch"
+
+    def checkout(self, db: dolt.Dolt):
+        print(self)
+        res = db.sql(f"select * from dolt_branches where name = '{self.branch}'", result_format="csv")
+        if len(res) == 0:
+            db.sql(f"select dolt_checkout('-b', '{self.branch}')", result_format="csv")
+        else:
+            db.sql(f"select dolt_checkout('{self.branch}')", result_format="csv")
+
+    def merge(self, db: dolt.Dolt, starting_branch: str):
+        pass
 
 
 @dataclass_json
@@ -192,7 +213,7 @@ def dolt_import_csv(
     tables = db.ls()
     for t in tables:
         if t.name == tablename:
-            mode = "-u"
+            mode = "-r"
             break
 
     filetype = "--file-type csv"
@@ -205,6 +226,18 @@ def dolt_import_csv(
     imp.append(filename)
     db.execute(imp)
 
+
+def parse_branch_conf(conf):
+    if not isinstance(conf, Branch):
+        try:
+            if not isinstance(conf, dict) or "_type" not in conf:
+                conf = SerialBranch()
+            else:
+                conf = globals()[conf["_type"]](**conf)
+        except Exception as e:
+            print("failed to parse `branch_conf`")
+            raise e
+    return conf
 
 def load(
     db: dolt.Dolt,
@@ -225,11 +258,10 @@ def load(
     if tablename is not None and sql is not None:
         raise ValueError("Specify one of: tablename, qury")
 
+    branch_conf = parse_branch_conf(branch_conf)
+
     if remote_conf is not None:
         remote_conf.pull(db)
-
-    if branch_conf is None:
-        branch_conf = SerialBranch()
 
     with branch_conf(db) as chk_db:
         if tablename is not None:
@@ -277,11 +309,10 @@ def save(
     record action metadata (after merge b/c we care about persisted state)
     remote push
     """
+    branch_conf = parse_branch_conf(branch_conf)
+
     if remote_conf is not None:
         remote_conf.pull(db)
-
-    if branch_conf is None:
-        branch_conf = SerialBranch()
 
     with branch_conf(db) as chk_db:
         from_commit = chk_db.head
