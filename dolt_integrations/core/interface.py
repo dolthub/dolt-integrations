@@ -109,7 +109,7 @@ class DoltMeta(Meta):
         with branch_config(self.db):
             tables = self.db.sql(
                 f"select * from information_schema.tables where table_name = '{self.tablename}'",
-                result_format="json",
+                result_format="csv",
             )
 
             if len(tables["rows"]) < 1:
@@ -126,7 +126,7 @@ class DoltMeta(Meta):
                         primary key (kind, to_commit, tablename, timestamp, context_id)
                     )
                 """
-                self.db.sql(create_table)
+                self.db.sql(create_table, result_format="csv")
 
             self.db.sql(
                 f"""
@@ -321,10 +321,10 @@ def save(
             db=db, tablename=tablename, filename=filename, save_args=save_args
         )
 
-        chk_db.sql(f"select dolt_add('.')")
+        chk_db.sql(f"select dolt_add('.')", result_format="csv")
         status = chk_db.sql("select * from dolt_status", result_format="csv")
         if len(status) > 0:
-            chk_db.sql("select dolt_commit('-m', 'Automated commit')")
+            chk_db.sql("select dolt_commit('-m', 'Automated commit')", result_format="csv")
 
         to_commit = chk_db.head
         branch = chk_db.active_branch
